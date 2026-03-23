@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const GUEST_KEY = 'diplomator_guest_usage';
+const GUEST_KEY = 'certera_guest_usage';
 const MAX_GUEST_GENERATIONS = 3;
 
 interface GuestUsage {

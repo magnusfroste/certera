@@ -106,7 +106,7 @@ export const SharePanel = () => {
           
           <div style="position: absolute; top: 12px; right: 12px; background: rgba(37, 99, 235, 0.95); color: white; padding: 6px 12px; border-radius: 15px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; backdrop-filter: blur(4px);">
             <span style="font-size: 12px;">🛡️</span>
-            Verified by Diplomator
+            Verified by certera.ink
           </div>
           
           ${currentDiplomaId ? `

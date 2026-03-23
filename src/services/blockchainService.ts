@@ -33,7 +33,7 @@ export const createContentHash = async (html: string, css: string): Promise<stri
 };
 
 /**
- * Creates Diplomator's cryptographic signature
+ * Creates certera.ink's cryptographic signature
  */
 const DIPLOMATOR_PRIVATE_KEY = 'diplomator_secure_key_2024';
 
@@ -51,7 +51,7 @@ export const generateDiplomaId = (): string => {
 
 const getCurrentBaseUrl = (): string => {
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'https://diplomator.lovable.app';
+  return 'https://certera.ink';
 };
 
 /**
@@ -180,7 +180,7 @@ export const verifyDiplomaFromBlockchain = async (
   // Verify signature
   const expectedSignature = await createDiplomatorSignature(diplomaData.content_hash, recipientName);
   if (expectedSignature !== diplomaData.signature) {
-    issues.push('Invalid Diplomator signature');
+    issues.push('Invalid certera.ink signature');
   }
 
   // Verify recipient
