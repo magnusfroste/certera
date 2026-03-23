@@ -76,7 +76,7 @@ serve(async (req) => {
       // Create a new topic for diploma verification
       console.log('Creating new HCS topic...');
       const topicTx = await new TopicCreateTransaction()
-        .setTopicMemo('Diplomator - Diploma Verification')
+        .setTopicMemo('certera.ink - Diploma Verification')
         .execute(client);
       const topicReceipt = await topicTx.getReceipt(client);
       topicId = topicReceipt.topicId!.toString();

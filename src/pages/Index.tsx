@@ -47,7 +47,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
                     <div className="bg-primary/15 border border-primary/20 p-1.5 rounded-lg">
                       <Award className="w-5 h-5 text-primary" />
                     </div>
-                    <h1 className="text-lg font-semibold tracking-tight text-foreground">Diplomator</h1>
+                    <h1 className="text-lg font-semibold tracking-tight text-foreground">certera.ink</h1>
                   </>
                 )}
               </div>

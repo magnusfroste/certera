@@ -91,7 +91,7 @@ const TestDiploma = () => {
             <Award className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Diplomator</h1>
+            <h1 className="text-2xl font-bold text-gray-900">certera.ink</h1>
             <p className="text-sm text-gray-600">Test Diploma Page</p>
           </div>
         </div>
