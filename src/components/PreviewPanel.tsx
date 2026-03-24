@@ -206,35 +206,9 @@ export const PreviewPanel = () => {
   return (
     <div className="h-full flex flex-col">
       <Tabs defaultValue="preview" className="h-full flex flex-col">
-        {/* Header with Tabs */}
-        <div className="px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse-dot" />
-              <h2 className="text-sm font-medium text-foreground">Canvas</h2>
-            </div>
-            <div className="flex gap-1">
-              <AnimationTemplates />
-              <Toggle
-                size="sm"
-                pressed={isEditMode}
-                onPressedChange={setIsEditMode}
-                className="h-7 w-7 p-0 text-muted-foreground data-[state=on]:text-primary data-[state=on]:bg-primary/10"
-                aria-label="Toggle edit mode"
-                disabled={!diplomaHtml}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </Toggle>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleFullscreen}>
-                <Maximize className="w-3.5 h-3.5" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleDownload}>
-                <Download className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
-          
-          <TabsList className="w-fit h-8 bg-secondary">
+        {/* Compact single-row header */}
+        <div className="px-3 py-2 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between gap-2">
+          <TabsList className="h-8 bg-secondary">
             <TabsTrigger value="preview" className="text-xs h-6 px-2.5">
               <Eye className="w-3 h-3 mr-1" />
               Preview
@@ -256,6 +230,26 @@ export const PreviewPanel = () => {
               Share
             </TabsTrigger>
           </TabsList>
+
+          <div className="flex gap-1">
+            <AnimationTemplates />
+            <Toggle
+              size="sm"
+              pressed={isEditMode}
+              onPressedChange={setIsEditMode}
+              className="h-7 w-7 p-0 text-muted-foreground data-[state=on]:text-primary data-[state=on]:bg-primary/10"
+              aria-label="Toggle edit mode"
+              disabled={!diplomaHtml}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </Toggle>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleFullscreen}>
+              <Maximize className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleDownload}>
+              <Download className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
 
         {/* Content */}
