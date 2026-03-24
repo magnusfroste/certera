@@ -26,7 +26,7 @@ export const MonacoEditor: React.FC<MonacoEditorProps> = ({
         language={language}
         value={value}
         onChange={handleEditorChange}
-        theme="vs-light"
+        theme="vs-dark"
         options={{
           minimap: { enabled: false },
           fontSize: 14,

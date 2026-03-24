@@ -51,18 +51,14 @@ export const ChatPanel = ({ isGuest, guestAccess }: ChatPanelProps) => {
             disabled={isGenerating}
           />
           <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between">
-            {!diplomaHtml ? (
-              <GenerationToolbar
-                isGenerating={isGenerating}
-                onGenerateFromImage={generateFromImage}
-                onGenerateFromUrl={generateFromUrl}
-                onRandomPrompt={setMessage}
-                buttonSize="h-7 w-7"
-                iconSize="w-3.5 h-3.5"
-              />
-            ) : (
-              <div />
-            )}
+            <GenerationToolbar
+              isGenerating={isGenerating}
+              onGenerateFromImage={generateFromImage}
+              onGenerateFromUrl={generateFromUrl}
+              onRandomPrompt={setMessage}
+              buttonSize="h-7 w-7"
+              iconSize="w-3.5 h-3.5"
+            />
 
             <Button
               onClick={handleSendMessage}
