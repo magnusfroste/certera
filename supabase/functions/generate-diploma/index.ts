@@ -642,20 +642,58 @@ serve(async (req) => {
 
     // Call provider
     let result: AIResponse;
-    switch (provider) {
-      case 'openai':   result = await callOpenAI(systemPrompt, aiMessages, model, structured); break;
-      case 'gemini':   result = await callGemini(systemPrompt, aiMessages, model, structured); break;
-      case 'openrouter': result = await callOpenRouter(systemPrompt, aiMessages, model, structured); break;
-      case 'anthropic':
-      default:         result = await callAnthropic(systemPrompt, aiMessages, model, structured); break;
+    const callProvider = async (p: string, m: string): Promise<AIResponse> => {
+      switch (p) {
+        case 'openai':     return callOpenAI(systemPrompt, aiMessages, m, structured);
+        case 'gemini':     return callGemini(systemPrompt, aiMessages, m, structured);
+        case 'openrouter': return callOpenRouter(systemPrompt, aiMessages, m, structured);
+        case 'anthropic':
+        default:           return callAnthropic(systemPrompt, aiMessages, m, structured);
+      }
+    };
+    // Default model per provider (used in fallback)
+    const defaultModelFor: Record<string, string> = {
+      anthropic: 'claude-sonnet-4-20250514',
+      openai: 'gpt-4o-mini',
+      gemini: 'gemini-2.5-flash-preview-05-20',
+      openrouter: 'openai/gpt-4o-mini',
+    };
+    // Build fallback chain: configured first, then any other provider with a key set
+    const keyEnv: Record<string, string> = {
+      anthropic: 'ANTHROPIC_API_KEY',
+      openai: 'OPENAI_API_KEY',
+      gemini: 'GEMINI_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
+    };
+    const chain: { p: string; m: string }[] = [{ p: provider, m: model }];
+    for (const p of ['anthropic', 'openai', 'gemini', 'openrouter']) {
+      if (p !== provider && Deno.env.get(keyEnv[p])) {
+        chain.push({ p, m: defaultModelFor[p] });
+      }
     }
+    let lastErr: any;
+    let usedProvider = provider;
+    let usedModel = model;
+    for (const step of chain) {
+      try {
+        result = await callProvider(step.p, step.m);
+        usedProvider = step.p;
+        usedModel = step.m;
+        if (step.p !== provider) console.warn(`Fell back from ${provider} to ${step.p}`);
+        break;
+      } catch (e: any) {
+        lastErr = e;
+        console.error(`Provider ${step.p} failed:`, e.message);
+      }
+    }
+    if (!result!) throw lastErr || new Error('All providers failed');
 
     if (isIteration) {
       const strip = (s: string) => s.replace(/```(?:html|css|)\s*/gi,'').replace(/```\s*/g,'').trim();
       const msg = result.text.match(/MESSAGE:\s*(.*?)(?=HTML:|$)/s)?.[1]?.trim() || "I've updated the diploma!";
       const htmlPart = strip(result.text.match(/HTML:\s*(.*?)(?=CSS:|$)/s)?.[1]?.trim() || '');
       const cssPart = strip(result.text.match(/CSS:\s*(.*?)$/s)?.[1]?.trim() || '');
-      return new Response(JSON.stringify({ message: msg, html: htmlPart, css: cssPart, provider, model }), {
+      return new Response(JSON.stringify({ message: msg, html: htmlPart, css: cssPart, provider: usedProvider, model: usedModel }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -668,8 +706,8 @@ serve(async (req) => {
       message: `Designed using ${dsl.palette} palette · ${dsl.typography?.pair} typography · ${dsl.layout?.composition} layout (variant ${variant}).`,
       html: rendered.html,
       css: rendered.css,
-      provider,
-      model,
+      provider: usedProvider,
+      model: usedModel,
       dsl,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
