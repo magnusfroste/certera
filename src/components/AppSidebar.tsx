@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Plus, Settings, LogOut, FileText, User, Award, PanelLeftClose, PanelLeft, ShieldCheck, Trash2 } from 'lucide-react';
+import { Plus, Settings, LogOut, User, Award, PanelLeftClose, PanelLeft, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -211,8 +211,7 @@ export function AppSidebar({ userEmail, userName }: AppSidebarProps) {
                           isActive={session.id === currentSessionId}
                           tooltip={session.title}
                         >
-                          <FileText className="h-4 w-4 shrink-0" />
-                          <span className="truncate flex-1">{session.title}</span>
+                          <span className="truncate flex-1 pr-6">{session.title}</span>
                         </SidebarMenuButton>
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(session); }}
