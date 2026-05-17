@@ -33,7 +33,6 @@ const integrations: IntegrationConfig[] = [
       { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Latest)' },
       { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
       { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
       { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku (Fast/Cheap)' },
       { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus (Most capable)' },
     ],
