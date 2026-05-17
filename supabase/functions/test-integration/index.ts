@@ -143,6 +143,41 @@ serve(async (req) => {
         result = { success: true, message: text, model: selectedModel, latencyMs };
       }
 
+    } else if (provider === 'openrouter') {
+      const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+      if (!apiKey) {
+        return new Response(JSON.stringify({ success: false, message: 'OPENROUTER_API_KEY not configured. Add it as a Supabase secret.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const selectedModel = model || 'openai/gpt-4o-mini';
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://certera.ink',
+          'X-Title': 'Certera Diploma Generator',
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          max_tokens: 50,
+          messages: [{ role: 'user', content: 'Say "Integration test OK" in exactly those words.' }],
+        }),
+      });
+
+      const latencyMs = Date.now() - start;
+
+      if (!response.ok) {
+        const err = await response.text();
+        result = { success: false, message: `API error ${response.status}: ${err.substring(0, 200)}`, model: selectedModel, latencyMs };
+      } else {
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content || 'No response';
+        result = { success: true, message: text, model: selectedModel, latencyMs };
+      }
+
     } else if (provider === 'firecrawl') {
       const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
       if (!apiKey) {

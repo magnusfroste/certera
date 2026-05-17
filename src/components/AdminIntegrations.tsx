@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save, Network, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface IntegrationConfig {
@@ -69,6 +69,27 @@ const integrations: IntegrationConfig[] = [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
       { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Cheapest)' },
+    ],
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter (Multi-provider gateway)',
+    icon: <Network className="h-5 w-5" />,
+    description: 'Single API key to access 100+ models (OpenAI, Anthropic, Google, Mistral, Llama, etc.).',
+    secretName: 'OPENROUTER_API_KEY',
+    getKeyUrl: 'https://openrouter.ai/keys',
+    getKeyInstructions: 'Sign in at openrouter.ai → Keys → Create Key. Add credits or use free-tier models.',
+    supabaseSecretCommand: 'supabase secrets set OPENROUTER_API_KEY=sk-or-xxxxx',
+    models: [
+      { value: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4' },
+      { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+      { value: 'openai/gpt-4o', label: 'GPT-4o' },
+      { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (Cheap)' },
+      { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { value: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+      { value: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
+      { value: 'mistralai/mistral-large', label: 'Mistral Large' },
+      { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat (Cheap)' },
     ],
   },
   {
