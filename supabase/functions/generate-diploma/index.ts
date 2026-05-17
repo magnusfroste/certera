@@ -507,6 +507,44 @@ async function callGemini(systemPrompt: string, messages: any[], model: string, 
   return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
 }
 
+async function callOpenRouter(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
+
+  const oaiMsgs: any[] = [{ role: 'system', content: systemPrompt }];
+  for (const msg of messages) {
+    if (Array.isArray(msg.content)) {
+      const parts = msg.content.map((p: any) =>
+        p.type === 'text' ? { type: 'text', text: p.text }
+        : { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } });
+      oaiMsgs.push({ role: msg.role, content: parts });
+    } else oaiMsgs.push({ role: msg.role, content: msg.content });
+  }
+
+  const body: any = { model, max_tokens: 4000, messages: oaiMsgs };
+  if (structured) {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: { name: 'diploma_dsl', schema: DSL_JSON_SCHEMA, strict: false },
+    };
+  }
+
+  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://certera.ink',
+      'X-Title': 'Certera Diploma Generator',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`OpenRouter API error ${r.status}: ${(await r.text()).substring(0,300)}`);
+  const data = await r.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  return { text };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // 11. JSON extraction fallback
 // ─────────────────────────────────────────────────────────────────
@@ -607,6 +645,7 @@ serve(async (req) => {
     switch (provider) {
       case 'openai':   result = await callOpenAI(systemPrompt, aiMessages, model, structured); break;
       case 'gemini':   result = await callGemini(systemPrompt, aiMessages, model, structured); break;
+      case 'openrouter': result = await callOpenRouter(systemPrompt, aiMessages, model, structured); break;
       case 'anthropic':
       default:         result = await callAnthropic(systemPrompt, aiMessages, model, structured); break;
     }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save, Network, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface IntegrationConfig {
@@ -69,6 +69,27 @@ const integrations: IntegrationConfig[] = [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
       { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Cheapest)' },
+    ],
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter (Multi-provider gateway)',
+    icon: <Network className="h-5 w-5" />,
+    description: 'Single API key to access 100+ models (OpenAI, Anthropic, Google, Mistral, Llama, etc.).',
+    secretName: 'OPENROUTER_API_KEY',
+    getKeyUrl: 'https://openrouter.ai/keys',
+    getKeyInstructions: 'Sign in at openrouter.ai → Keys → Create Key. Add credits or use free-tier models.',
+    supabaseSecretCommand: 'supabase secrets set OPENROUTER_API_KEY=sk-or-xxxxx',
+    models: [
+      { value: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4' },
+      { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+      { value: 'openai/gpt-4o', label: 'GPT-4o' },
+      { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (Cheap)' },
+      { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { value: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+      { value: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
+      { value: 'mistralai/mistral-large', label: 'Mistral Large' },
+      { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat (Cheap)' },
     ],
   },
   {
@@ -213,6 +234,26 @@ const AdminIntegrations = () => {
         </CardContent>
       </Card>
 
+      {/* Model requirements */}
+      <Card className="border-dashed bg-muted/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Info className="h-4 w-4 text-primary" />
+            Model requirements
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted-foreground space-y-1.5">
+          <p>For the AI to produce valid diplomas, the model must support:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Structured JSON output</strong> (response_format / tool calling / responseSchema) — the DSL is locked to a JSON schema.</li>
+            <li><strong>System prompts</strong> and a context window of at least <strong>16k tokens</strong>.</li>
+            <li><strong>Instruction following</strong> at GPT-4 / Claude 3.5 / Gemini 1.5+ level — smaller models often break the schema.</li>
+            <li><strong>Vision input</strong> (optional) only if you want image-inspired generation.</li>
+          </ul>
+          <p className="pt-1">Recommended: Claude Sonnet 4, GPT-4o, Gemini 2.5 Pro, or equivalent via OpenRouter.</p>
+        </CardContent>
+      </Card>
+
       {/* Self-hosting info */}
       <Card className="border-dashed">
         <CardHeader className="pb-3">
@@ -225,6 +266,7 @@ const AdminIntegrations = () => {
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
 supabase secrets set OPENAI_API_KEY=sk-xxxxx
 supabase secrets set GEMINI_API_KEY=AIzaxxxxx
+supabase secrets set OPENROUTER_API_KEY=sk-or-xxxxx
 supabase secrets set FIRECRAWL_API_KEY=fc-xxxxx`}
           </pre>
         </CardContent>
