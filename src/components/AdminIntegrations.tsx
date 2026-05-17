@@ -234,6 +234,26 @@ const AdminIntegrations = () => {
         </CardContent>
       </Card>
 
+      {/* Model requirements */}
+      <Card className="border-dashed bg-muted/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Info className="h-4 w-4 text-primary" />
+            Model requirements
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted-foreground space-y-1.5">
+          <p>For the AI to produce valid diplomas, the model must support:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Structured JSON output</strong> (response_format / tool calling / responseSchema) — the DSL is locked to a JSON schema.</li>
+            <li><strong>System prompts</strong> and a context window of at least <strong>16k tokens</strong>.</li>
+            <li><strong>Instruction following</strong> at GPT-4 / Claude 3.5 / Gemini 1.5+ level — smaller models often break the schema.</li>
+            <li><strong>Vision input</strong> (optional) only if you want image-inspired generation.</li>
+          </ul>
+          <p className="pt-1">Recommended: Claude Sonnet 4, GPT-4o, Gemini 2.5 Pro, or equivalent via OpenRouter.</p>
+        </CardContent>
+      </Card>
+
       {/* Self-hosting info */}
       <Card className="border-dashed">
         <CardHeader className="pb-3">
@@ -246,6 +266,7 @@ const AdminIntegrations = () => {
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
 supabase secrets set OPENAI_API_KEY=sk-xxxxx
 supabase secrets set GEMINI_API_KEY=AIzaxxxxx
+supabase secrets set OPENROUTER_API_KEY=sk-or-xxxxx
 supabase secrets set FIRECRAWL_API_KEY=fc-xxxxx`}
           </pre>
         </CardContent>
