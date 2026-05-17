@@ -207,8 +207,8 @@ export const PreviewPanel = () => {
     <div className="h-full flex flex-col">
       <Tabs defaultValue="preview" className="h-full flex flex-col">
         {/* Compact single-row header */}
-        <div className="px-3 py-2 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between gap-2">
-          <TabsList className="h-8 bg-secondary">
+        <div className="px-2 sm:px-3 py-2 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between gap-2 flex-wrap">
+          <TabsList className="h-8 bg-secondary flex-wrap h-auto min-w-0">
             <TabsTrigger value="preview" className="text-xs h-6 px-2.5">
               <Eye className="w-3 h-3 mr-1" />
               Preview
@@ -231,7 +231,7 @@ export const PreviewPanel = () => {
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex gap-1">
+          <div className="flex gap-1 shrink-0">
             <AnimationTemplates />
             <Toggle
               size="sm"

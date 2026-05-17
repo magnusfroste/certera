@@ -34,13 +34,13 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
         />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {isGuest && <GuestBanner remainingGenerations={guestAccess.remainingGenerations} maxGenerations={guestAccess.maxGenerations} />}
 
         {/* Header - only for guests or when canvas is visible */}
         {(isGuest || hasCanvas) && (
           <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center justify-between px-4 py-2">
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 flex-wrap">
               <div className="flex items-center gap-2">
                 {isGuest && (
                   <>
