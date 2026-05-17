@@ -33,7 +33,7 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8">
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
       <div className="w-full max-w-2xl space-y-8 text-center">
         <div className="space-y-3">
           <div className="w-14 h-14 mx-auto bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center">
