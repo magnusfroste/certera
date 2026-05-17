@@ -7,138 +7,112 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// ── Scraping helpers ──
-
-const scrapeWebsiteData = async (url: string) => {
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      title: html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '',
-      colors: extractColors(html),
-      fonts: extractFonts(html),
-      brandName: extractBrandName(html, url),
-      themeColor: html.match(/<meta[^>]*name="theme-color"[^>]*content="([^"]*)"[^>]*>/i)?.[1] || '',
-    };
-  } catch (e) { console.error('Scrape error:', e); return null; }
+// ─────────────────────────────────────────────────────────────────
+// 1. PALETTES (curated, kontrast-garanterad)
+// ─────────────────────────────────────────────────────────────────
+const PALETTES: Record<string, { bg: string; primary: string; accent: string; text: string }> = {
+  'midnight-gold':       { bg: 'cosmic-dark',      primary: '#f0e6d3', accent: '#c6a961', text: 'light' },
+  'royal-burgundy':      { bg: 'royal-burgundy',   primary: '#3b0d0d', accent: '#c6a961', text: 'dark'  },
+  'ocean-brass':         { bg: 'ocean-deep',       primary: '#0c2340', accent: '#c9a84c', text: 'dark'  },
+  'forest-cream':        { bg: 'botanical-green',  primary: '#1a3c2a', accent: '#8b7355', text: 'dark'  },
+  'ivory-navy':          { bg: 'ivory',            primary: '#0f1b3d', accent: '#c9a84c', text: 'dark'  },
+  'parchment-burgundy':  { bg: 'parchment',        primary: '#5b2c20', accent: '#8b6f5e', text: 'dark'  },
+  'arctic-steel':        { bg: 'clean-white',      primary: '#2d3748', accent: '#3b6fa0', text: 'dark'  },
+  'vintage-sepia':       { bg: 'vintage-sepia',    primary: '#2d1b00', accent: '#8b6f5e', text: 'dark'  },
+  'watercolor-romance':  { bg: 'watercolor-soft',  primary: '#4a1942', accent: '#c45c7c', text: 'dark'  },
+  'minimal-mono':        { bg: 'clean-white',      primary: '#0a0a0a', accent: '#525252', text: 'dark'  },
+  'marble-emerald':      { bg: 'marble',           primary: '#064e3b', accent: '#c9a84c', text: 'dark'  },
+  'linen-charcoal':      { bg: 'linen',            primary: '#1a1a1a', accent: '#6b3a2a', text: 'dark'  },
+  'cosmic-cyan':         { bg: 'cosmic-dark',      primary: '#e0f2fe', accent: '#67e8f9', text: 'light' },
+  'desert-clay':         { bg: 'gradient-warm',    primary: '#5c2018', accent: '#c17c74', text: 'dark'  },
+  'coastal-fresh':       { bg: 'gradient-cool',    primary: '#0c2340', accent: '#2d8a9e', text: 'dark'  },
+  'editorial-rose':      { bg: 'watercolor-soft',  primary: '#1a1a1a', accent: '#c45c7c', text: 'dark'  },
 };
 
-const extractColors = (html: string) => {
-  const m = html.match(/#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|hsl\([^)]+\)/g);
-  return m ? [...new Set(m)].slice(0, 10) : [];
+// ─────────────────────────────────────────────────────────────────
+// 2. TYPOGRAPHY PAIRS (heading + body + script)
+// ─────────────────────────────────────────────────────────────────
+const TYPOGRAPHY: Record<string, { heading: string; body: string; script: string; gfont: string }> = {
+  'serif-classic': {
+    heading: "'Playfair Display', Georgia, serif", body: "'Lora', Georgia, serif", script: "'Dancing Script', cursive",
+    gfont: 'family=Playfair+Display:wght@700;900&family=Lora:wght@400;500&family=Dancing+Script:wght@700',
+  },
+  'sans-modern': {
+    heading: "'Inter', system-ui, sans-serif", body: "'Inter', system-ui, sans-serif", script: "'Caveat', cursive",
+    gfont: 'family=Inter:wght@300;400;700;900&family=Caveat:wght@700',
+  },
+  'display-editorial': {
+    heading: "'Bodoni Moda', serif", body: "'Source Serif Pro', Georgia, serif", script: "'Italianno', cursive",
+    gfont: 'family=Bodoni+Moda:wght@700;900&family=Source+Serif+Pro:wght@400;600&family=Italianno',
+  },
+  'script-romantic': {
+    heading: "'Cormorant Garamond', serif", body: "'Karla', sans-serif", script: "'Great Vibes', cursive",
+    gfont: 'family=Cormorant+Garamond:wght@500;700&family=Karla:wght@400;600&family=Great+Vibes',
+  },
+  'mono-tech': {
+    heading: "'JetBrains Mono', monospace", body: "'Inter', sans-serif", script: "'Caveat', cursive",
+    gfont: 'family=JetBrains+Mono:wght@600;800&family=Inter:wght@400;500&family=Caveat:wght@700',
+  },
+  'mixed-contrast': {
+    heading: "'Archivo Black', sans-serif", body: "'Hind', sans-serif", script: "'Pacifico', cursive",
+    gfont: 'family=Archivo+Black&family=Hind:wght@400;600&family=Pacifico',
+  },
 };
-const extractFonts = (html: string) => {
-  const fonts = new Set<string>();
-  for (const m of html.matchAll(/font-family\s*:\s*([^;]+)/gi)) {
-    const f = m[1].replace(/['"]/g, '').split(',')[0].trim();
-    if (f && f !== 'inherit') fonts.add(f);
+
+// ─────────────────────────────────────────────────────────────────
+// 3. COMPOSITIONS (struktural layout)
+// ─────────────────────────────────────────────────────────────────
+type Composition = 'classic-stack' | 'banner-top' | 'medallion-center' | 'split-horizontal' | 'corner-accent';
+
+function compositionCss(comp: Composition, primary: string, accent: string): string {
+  switch (comp) {
+    case 'banner-top':
+      return `.comp-banner .diploma-header{margin:-1em -1em 1.2em -1em;padding:1.2em;background:${primary};border-radius:2px 2px 0 0}.comp-banner .diploma-header .institution,.comp-banner .diploma-header .subtitle{color:#fff !important}.comp-banner .diploma-header .subtitle{opacity:.85}`;
+    case 'medallion-center':
+      return `.comp-medallion .diploma-bottom-row{flex-direction:column;align-items:center;gap:1em}.comp-medallion .diploma-seal-wrapper{justify-content:center !important;order:-1;margin-top:0;margin-bottom:.5em}`;
+    case 'split-horizontal':
+      return `.comp-split{display:grid;grid-template-columns:1fr 2fr;gap:2em;align-items:center}.comp-split .diploma-header{text-align:left;border-right:2px solid ${accent}40;padding-right:1.5em;margin-bottom:0}.comp-split .diploma-header .institution{text-align:left}.comp-split-content{display:flex;flex-direction:column;gap:.5em}`;
+    case 'corner-accent':
+      return `.comp-corner{position:relative}.comp-corner::before{content:'';position:absolute;top:0;left:0;width:80px;height:80px;border-top:6px solid ${accent};border-left:6px solid ${accent}}.comp-corner::after{content:'';position:absolute;bottom:0;right:0;width:80px;height:80px;border-bottom:6px solid ${accent};border-right:6px solid ${accent}}`;
+    case 'classic-stack':
+    default:
+      return '';
   }
-  return [...fonts].slice(0, 5);
-};
-const extractBrandName = (html: string, url: string) => {
-  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '';
-  const siteName = html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"[^>]*>/i)?.[1] || '';
-  return siteName || title.split(/[-|–—]/)[0].trim() || new URL(url).hostname.replace('www.', '').split('.')[0];
-};
+}
 
-// ── DSL Block Options (for prompt) ──
+// ─────────────────────────────────────────────────────────────────
+// 4. DECORATIONS (overlay-lager, max 2)
+// ─────────────────────────────────────────────────────────────────
+function decorationCss(decos: string[], primary: string, accent: string): string {
+  const out: string[] = [];
+  for (const d of decos.slice(0, 2)) {
+    switch (d) {
+      case 'corner-flourishes':
+        out.push(`.deco-flourish{position:relative}.deco-flourish .diploma-border::before{content:'❦';position:absolute;top:6px;left:10px;color:${accent};font-size:22px;z-index:2}.deco-flourish .diploma-border::after{content:'❦';position:absolute;bottom:6px;right:10px;color:${accent};font-size:22px;transform:rotate(180deg);z-index:2}`);
+        break;
+      case 'watermark-monogram':
+        out.push(`.deco-watermark .diploma-body{position:relative}.deco-watermark .diploma-body::before{content:'★';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:280px;color:${primary};opacity:.04;pointer-events:none;z-index:0}.deco-watermark .diploma-body>*{position:relative;z-index:1}`);
+        break;
+      case 'ribbon-banner':
+        out.push(`.deco-ribbon{position:relative;overflow:hidden}.deco-ribbon::before{content:'EST.';position:absolute;top:18px;right:-40px;background:${accent};color:#fff;padding:4px 50px;font-size:11px;font-weight:bold;letter-spacing:3px;transform:rotate(45deg);z-index:3}`);
+        break;
+      case 'guilloche-pattern':
+        out.push(`.deco-guilloche{background-image:repeating-radial-gradient(circle at 0 0,transparent 0,${primary}08 1px,transparent 2px,transparent 18px),repeating-radial-gradient(circle at 100% 100%,transparent 0,${accent}08 1px,transparent 2px,transparent 18px)}`);
+        break;
+      case 'laurel-side':
+        out.push(`.deco-laurel .diploma-body{position:relative;padding:0 60px}.deco-laurel .diploma-body::before,.deco-laurel .diploma-body::after{content:'❧';position:absolute;top:50%;transform:translateY(-50%);color:${accent};font-size:48px;opacity:.5}.deco-laurel .diploma-body::before{left:0;transform:translateY(-50%) scaleX(-1)}.deco-laurel .diploma-body::after{right:0}`);
+        break;
+      case 'subtle-grid':
+        out.push(`.deco-grid{background-image:linear-gradient(${primary}06 1px,transparent 1px),linear-gradient(90deg,${primary}06 1px,transparent 1px);background-size:24px 24px}`);
+        break;
+    }
+  }
+  return out.join('\n');
+}
 
-const DSL_SCHEMA = `{
-  "brand": { "name": "string", "primaryColor": "#hex", "accentColor": "#hex" },
-  "layout": { "orientation": "landscape|portrait", "padding": "compact|normal|spacious" },
-  "header": { "style": "serif-centered|modern-left|elegant-script|bold-caps|minimal|monumental", "institutionName": "string", "subtitle": "string?" },
-  "border": { "style": "ornamental|double-line|modern|minimal|classical|art-deco|celtic-knot|botanical-vine|wave|geometric-deco|none", "color": "#hex?" },
-  "body": { "title": "string", "preText": "string?", "recipientName": "string", "description": "string", "date": "string?", "courseOrProgram": "string?", "additionalFields": [{"label":"string","value":"string"}]? },
-  "seal": { "style": "classical-round|star|shield|ribbon|modern-circle|rosette|compass|laurel-wreath|none", "position": "bottom-right|bottom-left|bottom-center", "text": "string?" },
-  "signature": { "style": "handwriting|formal|elegant|stamp|digital", "name": "string", "title": "string?" },
-  "background": { "style": "parchment|clean-white|ivory|gradient-warm|gradient-cool|linen|marble|ocean-deep|cosmic-dark|botanical-green|vintage-sepia|watercolor-soft|royal-burgundy" },
-  "footer": { "verificationUrl": "string?", "additionalText": "string?" },
-  "customCss": "string?"
-}`;
-
-// ── System prompts ──
-
-const DSL_SYSTEM_PROMPT = `You are an expert diploma designer. You design diplomas by choosing from predefined visual blocks.
-
-RESPOND WITH ONLY A JSON OBJECT matching this schema (no markdown, no explanation outside JSON):
-${DSL_SCHEMA}
-
-RULES:
-- Choose blocks that match the style the user wants (classic, modern, elegant, bold, minimal).
-- The "signature.name" should default to "Mr Diploma" unless user specifies otherwise.
-- IMPORTANT: The "body.recipientName" MUST always be set to exactly "{{recipient_name}}" (the literal placeholder text). This allows bulk signing to personalize each diploma. Never use a real name here.
-- Use appropriate brand colors that match the institution or requested style.
-- "body.preText" is optional text before the recipient name like "This is to certify that".
-- "customCss" is for any extra CSS tweaks the predefined blocks don't cover. Keep it minimal.
-- Pick background, border, seal, and header styles that complement each other.
-
-COLOR CONTRAST RULES (CRITICAL):
-- The primaryColor is used for headings, titles, recipient name, and course text.
-- The accentColor is used for decorative elements, seal accents, and underlines.
-- ALWAYS ensure primaryColor has strong contrast against the chosen background:
-  - Light backgrounds (parchment, clean-white, ivory, gradient-warm, gradient-cool, linen, marble, watercolor-soft): use DARK primaryColor (#1a365d, #2d3748, #1a202c, #4a1942, #5b2c20, etc.)
-  - Medium/warm backgrounds (vintage-sepia, botanical-green, royal-burgundy): use DEEP DARK primaryColor (#1a1a2e, #2d1b00, #3b0d0d, #1a3a1a, etc.) — NOT gold/yellow/light colors!
-  - Dark backgrounds (ocean-deep, cosmic-dark): use LIGHT primaryColor (#e2e8f0, #ffffff, #f0e6d3, etc.)
-- NEVER use gold (#c6a961, #d4a855) or yellow as primaryColor on light/medium backgrounds — it is unreadable!
-- Gold/amber colors work well as accentColor for decorative touches, but NOT for body text.
-
-THEME GUIDELINES:
-- For formal/academic diplomas use: serif-centered/monumental header, ornamental/classical border, classical-round seal, parchment/ivory bg.
-- For modern/tech diplomas use: modern-left/minimal header, modern/wave border, modern-circle seal, clean-white/gradient-cool bg.
-- For elegant/artistic diplomas use: elegant-script header, art-deco/double-line border, rosette/laurel-wreath seal, linen/marble/watercolor-soft bg.
-- For nature/botanical diplomas use: serif-centered/elegant-script header, botanical-vine border, laurel-wreath seal, botanical-green bg.
-- For ocean/nautical diplomas use: elegant-script header, wave border, compass seal, ocean-deep bg.
-- For space/cosmic diplomas use: bold-caps/monumental header, geometric-deco border, star seal, cosmic-dark bg. Use light primaryColor AND add customCss color overrides (see below).
-- For vintage/classic diplomas use: serif-centered header, celtic-knot/ornamental border, classical-round seal, vintage-sepia bg.
-- For royal/formal diplomas use: monumental/bold-caps header, classical/double-line border, shield seal, royal-burgundy bg. Use deep dark primaryColor like #3b0d0d or #1a1a2e.
-
-DARK BACKGROUND customCss (REQUIRED for ocean-deep, cosmic-dark):
-When using dark backgrounds, ALWAYS add customCss with explicit light color overrides as a safety net:
-  "customCss": ".diploma-pretext,.diploma-description,.diploma-date,.diploma-footer,.diploma-footer a,.diploma-fields,.diploma-fields .field-label,.diploma-header .subtitle,.diploma-signature .sig-title{color:#ccc !important}"
-
-Return ONLY the JSON object. No extra text.`;
-
-const ITERATION_SYSTEM_PROMPT = `You are an expert diploma and certificate designer. You modify existing HTML/CSS diplomas.
-
-You CAN and SHOULD:
-- Add CSS animations (@keyframes, transitions, transform effects, bouncing, floating, rotating, pulsing, etc.)
-- Add decorative CSS-only visual elements (shapes, patterns, gradients, pseudo-elements)
-- Modify layout, colors, fonts, spacing, and any visual property
-- Add interactive CSS effects (hover, focus states)
-- Create fun visual experiments if the user asks (bouncing balls, particles, animated shapes — all via CSS/HTML)
-- Be creative and say yes to user requests
-
-FORBIDDEN: QR codes, <img> tags, external image files, markdown code fences, JavaScript/script tags.
-Use only HTML + CSS for all visual elements and animations.
-
-Format response as:
-MESSAGE: [brief explanation of what you did]
-HTML: [complete HTML, no markdown]
-CSS: [complete CSS, no markdown]
-
-Make the specific changes requested. Keep the existing design intact unless the user asks to change it.`;
-
-const IMAGE_SYSTEM_PROMPT = `You are an expert diploma designer. Analyze the uploaded image and design a diploma by choosing from predefined visual blocks.
-
-RESPOND WITH ONLY A JSON OBJECT matching this schema (no markdown, no explanation outside JSON):
-${DSL_SCHEMA}
-
-IMPORTANT: The "body.recipientName" MUST always be set to exactly "{{recipient_name}}" (the literal placeholder text). This allows bulk signing to personalize each diploma.
-Choose blocks that reflect the visual style of the uploaded image. Return ONLY the JSON object.`;
-
-const URL_SYSTEM_PROMPT = `You are an expert diploma designer. Design a diploma matching a brand's visual identity by choosing from predefined visual blocks.
-
-RESPOND WITH ONLY A JSON OBJECT matching this schema (no markdown, no explanation outside JSON):
-${DSL_SCHEMA}
-
-IMPORTANT: The "body.recipientName" MUST always be set to exactly "{{recipient_name}}" (the literal placeholder text). This allows bulk signing to personalize each diploma.
-Use the provided website data to pick appropriate brand colors, fonts, and style. Return ONLY the JSON object.`;
-
-// ── Inline DSL Renderer (edge functions can't import from src/) ──
-
+// ─────────────────────────────────────────────────────────────────
+// 5. BACKGROUNDS / BORDERS / HEADERS / SEALS / SIGNATURES
+// ─────────────────────────────────────────────────────────────────
 const BG_STYLES: Record<string, string> = {
   'parchment': 'background: linear-gradient(135deg, #f5f0e8 0%, #e8dcc8 50%, #f0e6d3 100%);',
   'clean-white': 'background: #ffffff;',
@@ -157,83 +131,137 @@ const BG_STYLES: Record<string, string> = {
 
 function getBorderCss(style: string, color: string): string {
   const styles: Record<string, string> = {
-    'ornamental': `.diploma-border{border:3px solid ${color};outline:1px solid ${color};outline-offset:6px;position:relative}.diploma-border::before{content:'';position:absolute;top:8px;left:8px;right:8px;bottom:8px;border:1px solid ${color}40}.diploma-border::after{content:'❧';position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:inherit;padding:0 12px;color:${color};font-size:16px}`,
+    'ornamental': `.diploma-border{border:3px solid ${color};outline:1px solid ${color};outline-offset:6px;position:relative}.diploma-border::before{content:'';position:absolute;top:8px;left:8px;right:8px;bottom:8px;border:1px solid ${color}40}`,
     'double-line': `.diploma-border{border:3px double ${color};padding:4px;outline:1px solid ${color}60;outline-offset:4px}`,
     'modern': `.diploma-border{border:2px solid ${color};border-radius:4px}`,
     'minimal': `.diploma-border{border:1px solid ${color}40}`,
     'classical': `.diploma-border{border:4px solid ${color};box-shadow:inset 0 0 0 2px white,inset 0 0 0 4px ${color}30}`,
     'art-deco': `.diploma-border{border:2px solid ${color};position:relative}.diploma-border::before,.diploma-border::after{content:'';position:absolute;width:40px;height:40px;border:2px solid ${color}}.diploma-border::before{top:8px;left:8px;border-right:none;border-bottom:none}.diploma-border::after{bottom:8px;right:8px;border-left:none;border-top:none}`,
-    'celtic-knot': `.diploma-border{border:3px solid ${color};outline:3px solid ${color};outline-offset:4px;position:relative}.diploma-border::before{content:'⟐';position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:inherit;padding:0 8px;color:${color};font-size:18px}.diploma-border::after{content:'⟐';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);background:inherit;padding:0 8px;color:${color};font-size:18px}`,
-    'botanical-vine': `.diploma-border{border:2px solid ${color};position:relative}.diploma-border::before{content:'❦';position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:inherit;padding:0 10px;color:${color};font-size:20px}.diploma-border::after{content:'❦';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%) rotate(180deg);background:inherit;padding:0 10px;color:${color};font-size:20px}`,
     'wave': `.diploma-border{border:2px solid ${color};border-radius:8px;box-shadow:0 0 0 4px ${color}15,0 0 0 8px ${color}10,0 0 0 12px ${color}05}`,
-    'geometric-deco': `.diploma-border{border:2px solid ${color};position:relative}.diploma-border::before,.diploma-border::after{content:'';position:absolute;width:30px;height:30px;border:2px solid ${color};transform:rotate(45deg)}.diploma-border::before{top:-16px;left:50%;margin-left:-15px;border-bottom:none;border-right:none}.diploma-border::after{bottom:-16px;left:50%;margin-left:-15px;border-top:none;border-left:none}`,
     'none': '.diploma-border{}',
   };
   return styles[style] || styles['classical'];
 }
 
-function getHeaderCss(style: string, color: string): string {
-  const styles: Record<string, string> = {
-    'serif-centered': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:'Georgia',serif;font-size:28px;font-weight:bold;color:${color};letter-spacing:3px;text-transform:uppercase;margin-bottom:4px}.diploma-header .subtitle{font-family:'Georgia',serif;font-size:14px;color:${color}99;font-style:italic}`,
-    'modern-left': `.diploma-header{text-align:left;margin-bottom:1.5em;border-left:4px solid ${color};padding-left:16px}.diploma-header .institution{font-family:'Helvetica Neue',Arial,sans-serif;font-size:24px;font-weight:700;color:${color}}.diploma-header .subtitle{font-size:13px;color:#666;margin-top:2px}`,
-    'elegant-script': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:'Dancing Script',cursive;font-size:36px;color:${color}}.diploma-header .subtitle{font-family:'Georgia',serif;font-size:13px;color:${color}80;letter-spacing:2px;text-transform:uppercase;margin-top:4px}`,
-    'bold-caps': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:'Georgia',serif;font-size:32px;font-weight:bold;color:${color};letter-spacing:6px;text-transform:uppercase}.diploma-header .subtitle{font-size:12px;color:${color}70;letter-spacing:4px;text-transform:uppercase;margin-top:6px}`,
-    'minimal': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:'Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:300;color:${color};letter-spacing:4px;text-transform:uppercase}.diploma-header .subtitle{font-size:12px;color:#999;margin-top:4px}`,
-    'monumental': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:'Georgia',serif;font-size:38px;font-weight:bold;color:${color};letter-spacing:10px;text-transform:uppercase;border-bottom:3px double ${color};padding-bottom:8px;display:inline-block}.diploma-header .subtitle{font-size:13px;color:${color}80;letter-spacing:6px;text-transform:uppercase;margin-top:10px}`,
+function getHeaderCss(style: string, color: string, headingFont: string): string {
+  const map: Record<string, string> = {
+    'serif-centered':  `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:${headingFont};font-size:28px;font-weight:bold;color:${color};letter-spacing:3px;text-transform:uppercase;margin-bottom:4px}.diploma-header .subtitle{font-family:${headingFont};font-size:14px;color:${color}99;font-style:italic}`,
+    'modern-left':     `.diploma-header{text-align:left;margin-bottom:1.5em;border-left:4px solid ${color};padding-left:16px}.diploma-header .institution{font-family:${headingFont};font-size:24px;font-weight:700;color:${color}}.diploma-header .subtitle{font-size:13px;color:#666;margin-top:2px}`,
+    'elegant-script': `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:${headingFont};font-size:36px;color:${color}}.diploma-header .subtitle{font-size:13px;color:${color}80;letter-spacing:2px;text-transform:uppercase;margin-top:4px}`,
+    'bold-caps':       `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:${headingFont};font-size:32px;font-weight:bold;color:${color};letter-spacing:6px;text-transform:uppercase}.diploma-header .subtitle{font-size:12px;color:${color}70;letter-spacing:4px;text-transform:uppercase;margin-top:6px}`,
+    'minimal':         `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:${headingFont};font-size:20px;font-weight:300;color:${color};letter-spacing:4px;text-transform:uppercase}.diploma-header .subtitle{font-size:12px;color:#999;margin-top:4px}`,
+    'monumental':      `.diploma-header{text-align:center;margin-bottom:1.5em}.diploma-header .institution{font-family:${headingFont};font-size:38px;font-weight:bold;color:${color};letter-spacing:10px;text-transform:uppercase;border-bottom:3px double ${color};padding-bottom:8px;display:inline-block}.diploma-header .subtitle{font-size:13px;color:${color}80;letter-spacing:6px;text-transform:uppercase;margin-top:10px}`,
   };
-  return styles[style] || styles['serif-centered'];
+  return map[style] || map['serif-centered'];
 }
 
 function getSealHtmlCss(style: string, color: string, text?: string): {html:string;css:string} {
   if (!style || style === 'none') return {html:'',css:''};
   const t = text || 'VERIFIED';
-  const styles: Record<string, {html:string;css:string}> = {
+  const map: Record<string, {html:string;css:string}> = {
     'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:2px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'star': {css:`.diploma-seal{width:80px;height:80px;background:${color};clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);display:flex;align-items:center;justify-content:center;color:white;font-size:20px}`,html:`<div class="diploma-seal">★</div>`},
     'shield': {css:`.diploma-seal{width:70px;height:85px;background:${color};clip-path:polygon(0% 0%,100% 0%,100% 70%,50% 100%,0% 70%);display:flex;align-items:center;justify-content:center;padding-bottom:10px}.diploma-seal .seal-text{color:white;font-size:8px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'ribbon': {css:`.diploma-seal{background:${color};color:white;padding:6px 24px;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;position:relative}.diploma-seal::before,.diploma-seal::after{content:'';position:absolute;bottom:-8px;border:8px solid ${color};border-bottom-color:transparent}.diploma-seal::before{left:0;border-left-color:transparent}.diploma-seal::after{right:0;border-right-color:transparent}`,html:`<div class="diploma-seal">CERTIFIED</div>`},
     'modern-circle': {css:`.diploma-seal{width:60px;height:60px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:${color}}`,html:`<div class="diploma-seal">✓</div>`},
     'rosette': {css:`.diploma-seal{width:80px;height:80px;background:radial-gradient(circle,${color} 30%,transparent 31%),conic-gradient(from 0deg,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60);border-radius:50%;display:flex;align-items:center;justify-content:center}.diploma-seal .seal-text{color:white;font-size:9px;font-weight:bold;letter-spacing:1px}`,html:`<div class="diploma-seal"><span class="seal-text">AWARD</span></div>`},
-    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal::after{content:'✦';position:absolute;top:4px;left:50%;transform:translateX(-50%);color:${color};font-size:10px}.diploma-seal .seal-text{font-size:18px;font-weight:bold;color:${color}}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal .seal-text{font-size:18px;font-weight:bold;color:${color}}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'laurel-wreath': {css:`.diploma-seal{width:90px;height:90px;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'❧';position:absolute;left:2px;top:50%;transform:translateY(-50%) scaleX(-1);color:${color};font-size:32px}.diploma-seal::after{content:'❧';position:absolute;right:2px;top:50%;transform:translateY(-50%);color:${color};font-size:32px}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:2px;text-transform:uppercase;border-top:1px solid ${color}40;border-bottom:1px solid ${color}40;padding:4px 0}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
   };
-  return styles[style] || styles['classical-round'];
+  return map[style] || map['classical-round'];
 }
 
-function getSignatureHtmlCss(style: string, name: string, title?: string, color = '#333'): {html:string;css:string} {
-  const styles: Record<string, {html:string;css:string}> = {
-    'handwriting': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-name{font-family:'Dancing Script',cursive;font-size:28px;color:${color};border-bottom:1px solid ${color}40;padding-bottom:4px;display:inline-block}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:4px}`,html:`<div class="diploma-signature"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
-    'formal': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-line{width:200px;border-bottom:1px solid ${color};margin:0 auto 6px}.diploma-signature .sig-name{font-family:'Georgia',serif;font-size:16px;color:${color};font-weight:bold}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-line"></div><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
-    'elegant': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-name{font-family:'Great Vibes',cursive;font-size:32px;color:${color}}.diploma-signature .sig-title{font-family:'Georgia',serif;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
-    'stamp': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-stamp{display:inline-block;border:3px solid ${color};border-radius:4px;padding:6px 18px;transform:rotate(-3deg)}.diploma-signature .sig-name{font-family:'Georgia',serif;font-size:14px;font-weight:bold;color:${color};letter-spacing:3px;text-transform:uppercase}.diploma-signature .sig-title{font-size:10px;color:${color}80;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-stamp"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div></div>`},
-    'digital': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-digital{display:inline-flex;align-items:center;gap:8px;background:${color}08;border:1px solid ${color}20;border-radius:6px;padding:8px 16px}.diploma-signature .sig-icon{font-size:18px;color:${color}}.diploma-signature .sig-info{text-align:left}.diploma-signature .sig-name{font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;font-weight:600;color:${color}}.diploma-signature .sig-title{font-size:10px;color:#888;margin-top:1px}.diploma-signature .sig-verified{font-size:9px;color:${color}90;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-digital"><span class="sig-icon">🔏</span><div class="sig-info"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}<div class="sig-verified">Digitally signed</div></div></div></div>`},
+function getSignatureHtmlCss(style: string, name: string, title: string | undefined, color: string, scriptFont: string, headingFont: string): {html:string;css:string} {
+  const map: Record<string, {html:string;css:string}> = {
+    'handwriting': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-name{font-family:${scriptFont};font-size:28px;color:${color};border-bottom:1px solid ${color}40;padding-bottom:4px;display:inline-block}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:4px}`,html:`<div class="diploma-signature"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
+    'formal': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-line{width:200px;border-bottom:1px solid ${color};margin:0 auto 6px}.diploma-signature .sig-name{font-family:${headingFont};font-size:16px;color:${color};font-weight:bold}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-line"></div><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
+    'elegant': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-name{font-family:${scriptFont};font-size:32px;color:${color}}.diploma-signature .sig-title{font-family:${headingFont};font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
+    'stamp': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-stamp{display:inline-block;border:3px solid ${color};border-radius:4px;padding:6px 18px;transform:rotate(-3deg)}.diploma-signature .sig-name{font-family:${headingFont};font-size:14px;font-weight:bold;color:${color};letter-spacing:3px;text-transform:uppercase}.diploma-signature .sig-title{font-size:10px;color:${color}80;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-stamp"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div></div>`},
+    'digital': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-digital{display:inline-flex;align-items:center;gap:8px;background:${color}08;border:1px solid ${color}20;border-radius:6px;padding:8px 16px}.diploma-signature .sig-icon{font-size:18px;color:${color}}.diploma-signature .sig-info{text-align:left}.diploma-signature .sig-name{font-family:${headingFont};font-size:14px;font-weight:600;color:${color}}.diploma-signature .sig-title{font-size:10px;color:#888;margin-top:1px}.diploma-signature .sig-verified{font-size:9px;color:${color}90;letter-spacing:1px;text-transform:uppercase;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-digital"><span class="sig-icon">🔏</span><div class="sig-info"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}<div class="sig-verified">Digitally signed</div></div></div></div>`},
   };
-  return styles[style] || styles['handwriting'];
+  return map[style] || map['handwriting'];
 }
 
-function isLightColor(hex: string): boolean {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.substring(0, 2), 16) / 255;
-  const g = parseInt(c.substring(2, 4), 16) / 255;
-  const b = parseInt(c.substring(4, 6), 16) / 255;
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.5;
+// ─────────────────────────────────────────────────────────────────
+// 6. customCss SANITIZER (whitelist properties)
+// ─────────────────────────────────────────────────────────────────
+const ALLOWED_PROPS = new Set([
+  'color','background','background-color','letter-spacing','font-weight','font-style',
+  'font-size','text-transform','opacity','margin','margin-top','margin-bottom',
+  'padding','padding-top','padding-bottom','line-height','text-align','border-color',
+]);
+function sanitizeCustomCss(css: string): string {
+  if (!css || typeof css !== 'string' || css.length > 2000) return '';
+  // Strip @import, @keyframes, url(), expression(), JS schemes
+  const stripped = css.replace(/@(import|keyframes|font-face|media|supports)[^{]*\{[^}]*\}/gi,'')
+                      .replace(/url\s*\([^)]*\)/gi,'')
+                      .replace(/expression\s*\([^)]*\)/gi,'')
+                      .replace(/javascript:/gi,'');
+  // Only keep declarations whose property is whitelisted
+  return stripped.replace(/([^{}]+)\{([^{}]+)\}/g, (_m, sel, body) => {
+    const cleanBody = body.split(';').map((d: string) => {
+      const idx = d.indexOf(':');
+      if (idx < 0) return '';
+      const prop = d.slice(0, idx).trim().toLowerCase().replace(/^!\s*/, '');
+      return ALLOWED_PROPS.has(prop) ? d.trim() : '';
+    }).filter(Boolean).join(';');
+    return cleanBody ? `${sel}{${cleanBody}}` : '';
+  });
 }
 
+// ─────────────────────────────────────────────────────────────────
+// 7. RENDER
+// ─────────────────────────────────────────────────────────────────
 function renderDSL(dsl: any): {html:string;css:string} {
-  const pc = dsl.brand?.primaryColor || '#1a365d';
-  const ac = dsl.brand?.accentColor || '#c6a961';
+  // Palette resolution
+  const paletteId = dsl.palette || 'ivory-navy';
+  const palette = PALETTES[paletteId] || PALETTES['ivory-navy'];
+  const pc = dsl.brand?.primaryColor || palette.primary;
+  const ac = dsl.brand?.accentColor || palette.accent;
+  const bgKey = dsl.background?.style || palette.bg;
+  const bgCss = BG_STYLES[bgKey] || BG_STYLES['clean-white'];
+  const isLight = palette.text === 'light';
+
+  // Typography
+  const typId = dsl.typography?.pair || 'serif-classic';
+  const typ = TYPOGRAPHY[typId] || TYPOGRAPHY['serif-classic'];
+
+  // Layout
   const pad = ({compact:'24px',normal:'40px',spacious:'60px'} as any)[dsl.layout?.padding] || '40px';
-  const bgCss = BG_STYLES[dsl.background?.style] || BG_STYLES['clean-white'];
-  const light = isLightColor(pc);
-  const t = { body: light?'#ddd':'#333', sec: light?'#ccc':'#555', ter: light?'#aaa':'#666', mut: light?'#999':'#888', fnt: light?'#888':'#aaa' };
+  const composition: Composition = (dsl.layout?.composition as Composition) || 'classic-stack';
+  const compClass = ({
+    'classic-stack':'',
+    'banner-top':'comp-banner',
+    'medallion-center':'comp-medallion',
+    'split-horizontal':'comp-split',
+    'corner-accent':'comp-corner',
+  } as any)[composition] || '';
+
+  // Decorations
+  const decos: string[] = Array.isArray(dsl.decorations) ? dsl.decorations.slice(0,2) : [];
+  const decoClasses = decos.map(d => ({
+    'corner-flourishes':'deco-flourish',
+    'watermark-monogram':'deco-watermark',
+    'ribbon-banner':'deco-ribbon',
+    'guilloche-pattern':'deco-guilloche',
+    'laurel-side':'deco-laurel',
+    'subtle-grid':'deco-grid',
+  } as any)[d]).filter(Boolean).join(' ');
+
+  // Text colors (adaptive)
+  const t = isLight
+    ? { body:'#ddd', sec:'#ccc', ter:'#aaa', mut:'#999', fnt:'#888' }
+    : { body:'#333', sec:'#555', ter:'#666', mut:'#888', fnt:'#aaa' };
 
   const cssParts = [
-    `@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap');`,
-    `.diploma-container{max-width:800px;width:100%;margin:0 auto;padding:${pad};box-sizing:border-box;overflow:hidden;font-family:'Georgia','Times New Roman',serif;color:${t.body};${bgCss}}`,
+    `@import url('https://fonts.googleapis.com/css2?${typ.gfont}&display=swap');`,
+    `.diploma-container{max-width:800px;width:100%;margin:0 auto;padding:${pad};box-sizing:border-box;overflow:hidden;font-family:${typ.body};color:${t.body};${bgCss}}`,
     getBorderCss(dsl.border?.style || 'classical', dsl.border?.color || pc),
     `.diploma-border{overflow:visible;position:relative}`,
-    getHeaderCss(dsl.header?.style || 'serif-centered', pc),
-    `.diploma-body{text-align:center;margin:1.2em 0}.diploma-body .diploma-title{font-family:'Georgia',serif;font-size:32px;font-weight:bold;color:${pc};margin-bottom:0.8em;letter-spacing:2px;text-transform:uppercase}.diploma-body .diploma-pretext{font-size:14px;color:${t.ter};margin-bottom:0.5em;font-style:italic}.diploma-body .diploma-recipient{font-family:'Dancing Script',cursive;font-size:36px;color:${pc};margin:0.3em 0;border-bottom:2px solid ${ac}40;display:inline-block;padding:0 20px 4px}.diploma-body .diploma-description{font-size:15px;color:${t.sec};max-width:600px;margin:1em auto;line-height:1.6}.diploma-body .diploma-course{font-size:18px;font-weight:bold;color:${pc};margin:0.5em 0}.diploma-body .diploma-date{font-size:13px;color:${t.mut};margin-top:1em}.diploma-body .diploma-fields{margin-top:1em;font-size:13px;color:${t.ter}}.diploma-body .diploma-fields .field-label{font-weight:bold;color:${t.sec}}`,
+    getHeaderCss(dsl.header?.style || 'serif-centered', pc, typ.heading),
+    `.diploma-body{text-align:center;margin:1.2em 0}.diploma-body .diploma-title{font-family:${typ.heading};font-size:32px;font-weight:bold;color:${pc};margin-bottom:0.8em;letter-spacing:2px;text-transform:uppercase}.diploma-body .diploma-pretext{font-family:${typ.body};font-size:14px;color:${t.ter};margin-bottom:0.5em;font-style:italic}.diploma-body .diploma-recipient{font-family:${typ.script};font-size:42px;color:${pc};margin:0.3em 0;border-bottom:2px solid ${ac}40;display:inline-block;padding:0 20px 4px}.diploma-body .diploma-description{font-family:${typ.body};font-size:15px;color:${t.sec};max-width:600px;margin:1em auto;line-height:1.6}.diploma-body .diploma-course{font-family:${typ.heading};font-size:18px;font-weight:bold;color:${pc};margin:0.5em 0}.diploma-body .diploma-date{font-size:13px;color:${t.mut};margin-top:1em}.diploma-body .diploma-fields{margin-top:1em;font-size:13px;color:${t.ter}}.diploma-body .diploma-fields .field-label{font-weight:bold;color:${t.sec}}`,
+    compositionCss(composition, pc, ac),
+    decorationCss(decos, pc, ac),
   ];
 
   const seal = getSealHtmlCss(dsl.seal?.style || 'none', ac, dsl.seal?.text);
@@ -247,179 +275,286 @@ function renderDSL(dsl: any): {html:string;css:string} {
     cssParts.push(`.diploma-seal-wrapper{display:flex;${pos};margin-top:1em}`);
   }
 
-  const sig = getSignatureHtmlCss(dsl.signature?.style||'handwriting', dsl.signature?.name||'Mr Diploma', dsl.signature?.title, pc);
+  const sig = getSignatureHtmlCss(dsl.signature?.style||'handwriting', dsl.signature?.name||'Mr Diploma', dsl.signature?.title, pc, typ.script, typ.heading);
   cssParts.push(sig.css);
   cssParts.push(`.diploma-footer{text-align:center;margin-top:1.5em;font-size:10px;color:${t.fnt}}.diploma-footer a{color:${t.fnt};text-decoration:none}.diploma-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;margin-top:1.5em}.diploma-bottom-row.no-seal{justify-content:center}`);
-  if (dsl.customCss) cssParts.push(dsl.customCss);
+
+  const cleanCustom = sanitizeCustomCss(dsl.customCss || '');
+  if (cleanCustom) cssParts.push(cleanCustom);
 
   // Build HTML
-  const hasSeal = seal.html && dsl.seal?.style !== 'none';
+  const hasSeal = !!seal.html && dsl.seal?.style !== 'none';
   const fields = (dsl.body?.additionalFields||[]).map((f:any)=>`<div><span class="field-label">${f.label}:</span> ${f.value}</div>`).join('');
-  
-  const html = `<div class="diploma-container">
-<div class="diploma-border">
-<div class="diploma-header">
-<div class="institution">${dsl.header?.institutionName||'Institution'}</div>
-${dsl.header?.subtitle?`<div class="subtitle">${dsl.header.subtitle}</div>`:''}
-</div>
-<div class="diploma-body">
-<div class="diploma-title">${dsl.body?.title||'Certificate'}</div>
-${dsl.body?.preText?`<div class="diploma-pretext">${dsl.body.preText}</div>`:''}
-<div class="diploma-recipient">${dsl.body?.recipientName||'Recipient Name'}</div>
-<div class="diploma-description">${dsl.body?.description||''}</div>
-${dsl.body?.courseOrProgram?`<div class="diploma-course">${dsl.body.courseOrProgram}</div>`:''}
-${fields?`<div class="diploma-fields">${fields}</div>`:''}
-${dsl.body?.date?`<div class="diploma-date">${dsl.body.date}</div>`:''}
-</div>
-<div class="diploma-bottom-row${hasSeal?'':' no-seal'}">
-${sig.html}
-${hasSeal?`<div class="diploma-seal-wrapper">${seal.html}</div>`:''}
-</div>
-${dsl.footer?`<div class="diploma-footer">${dsl.footer.additionalText?`<div>${dsl.footer.additionalText}</div>`:''}${dsl.footer.verificationUrl?`<div><a href="${dsl.footer.verificationUrl}">Verify</a></div>`:''}</div>`:''}
-</div>
-</div>`;
+  const wrapperClasses = ['diploma-container', compClass, decoClasses].filter(Boolean).join(' ');
+
+  const headerHtml = `<div class="diploma-header"><div class="institution">${dsl.header?.institutionName||'Institution'}</div>${dsl.header?.subtitle?`<div class="subtitle">${dsl.header.subtitle}</div>`:''}</div>`;
+  const bodyHtml = `<div class="diploma-body"><div class="diploma-title">${dsl.body?.title||'Certificate'}</div>${dsl.body?.preText?`<div class="diploma-pretext">${dsl.body.preText}</div>`:''}<div class="diploma-recipient">${dsl.body?.recipientName||'Recipient Name'}</div><div class="diploma-description">${dsl.body?.description||''}</div>${dsl.body?.courseOrProgram?`<div class="diploma-course">${dsl.body.courseOrProgram}</div>`:''}${fields?`<div class="diploma-fields">${fields}</div>`:''}${dsl.body?.date?`<div class="diploma-date">${dsl.body.date}</div>`:''}</div>`;
+  const bottomHtml = `<div class="diploma-bottom-row${hasSeal?'':' no-seal'}">${sig.html}${hasSeal?`<div class="diploma-seal-wrapper">${seal.html}</div>`:''}</div>`;
+  const footerHtml = dsl.footer?`<div class="diploma-footer">${dsl.footer.additionalText?`<div>${dsl.footer.additionalText}</div>`:''}${dsl.footer.verificationUrl?`<div><a href="${dsl.footer.verificationUrl}">Verify</a></div>`:''}</div>`:'';
+
+  const inner = composition === 'split-horizontal'
+    ? `${headerHtml}<div class="comp-split-content">${bodyHtml}${bottomHtml}${footerHtml}</div>`
+    : `${headerHtml}${bodyHtml}${bottomHtml}${footerHtml}`;
+
+  const html = `<div class="${wrapperClasses}"><div class="diploma-border">${inner}</div></div>`;
 
   return { html, css: cssParts.join('\n') };
 }
 
-function extractJson(text: string): any {
-  let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('No JSON found in response');
-  cleaned = cleaned.substring(start, end + 1);
-  try { return JSON.parse(cleaned); }
-  catch { 
-    cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1F\x7F]/g, '');
-    return JSON.parse(cleaned);
-  }
+// ─────────────────────────────────────────────────────────────────
+// 8. JSON SCHEMA (used by all providers for structured output)
+// ─────────────────────────────────────────────────────────────────
+const PALETTE_IDS = Object.keys(PALETTES);
+const TYPOGRAPHY_IDS = Object.keys(TYPOGRAPHY);
+
+const DSL_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    palette: { type: 'string', enum: PALETTE_IDS, description: 'Curated color palette (decides bg + primary + accent)' },
+    typography: {
+      type: 'object',
+      properties: { pair: { type: 'string', enum: TYPOGRAPHY_IDS } },
+      required: ['pair'],
+    },
+    layout: {
+      type: 'object',
+      properties: {
+        orientation: { type: 'string', enum: ['landscape','portrait'] },
+        padding: { type: 'string', enum: ['compact','normal','spacious'] },
+        composition: { type: 'string', enum: ['classic-stack','banner-top','medallion-center','split-horizontal','corner-accent'] },
+      },
+      required: ['orientation','padding','composition'],
+    },
+    decorations: {
+      type: 'array',
+      items: { type: 'string', enum: ['corner-flourishes','watermark-monogram','ribbon-banner','guilloche-pattern','laurel-side','subtle-grid'] },
+      maxItems: 2,
+    },
+    header: {
+      type: 'object',
+      properties: {
+        style: { type: 'string', enum: ['serif-centered','modern-left','elegant-script','bold-caps','minimal','monumental'] },
+        institutionName: { type: 'string' },
+        subtitle: { type: 'string' },
+      },
+      required: ['style','institutionName'],
+    },
+    border: {
+      type: 'object',
+      properties: { style: { type: 'string', enum: ['ornamental','double-line','modern','minimal','classical','art-deco','wave','none'] } },
+      required: ['style'],
+    },
+    body: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        preText: { type: 'string' },
+        recipientName: { type: 'string' },
+        description: { type: 'string' },
+        date: { type: 'string' },
+        courseOrProgram: { type: 'string' },
+      },
+      required: ['title','recipientName','description'],
+    },
+    seal: {
+      type: 'object',
+      properties: {
+        style: { type: 'string', enum: ['classical-round','star','shield','ribbon','modern-circle','rosette','compass','laurel-wreath','none'] },
+        position: { type: 'string', enum: ['bottom-right','bottom-left','bottom-center'] },
+        text: { type: 'string' },
+      },
+      required: ['style','position'],
+    },
+    signature: {
+      type: 'object',
+      properties: {
+        style: { type: 'string', enum: ['handwriting','formal','elegant','stamp','digital'] },
+        name: { type: 'string' },
+        title: { type: 'string' },
+      },
+      required: ['style','name'],
+    },
+  },
+  required: ['palette','typography','layout','header','border','body','seal','signature'],
+};
+
+// ─────────────────────────────────────────────────────────────────
+// 9. PROMPTS
+// ─────────────────────────────────────────────────────────────────
+function dslSystemPrompt(variant: number): string {
+  return `You are an expert diploma designer. Pick from predefined, pre-tested visual blocks.
+
+DESIGN HEURISTIC:
+- Choose ONE palette that matches the requested vibe. The palette determines bg + colors automatically.
+- Choose ONE typography pair that fits the era/feel (serif-classic for formal, sans-modern for tech, display-editorial for premium, script-romantic for arts, mono-tech for dev, mixed-contrast for bold).
+- Choose ONE composition: classic-stack (safe default), banner-top (modern enterprise), medallion-center (award-ceremony), split-horizontal (landscape modern), corner-accent (minimal premium).
+- Pick 0–2 decorations max. They are overlays — do not pick more than 2 or it gets cluttered.
+
+CONSTRAINTS:
+- body.recipientName MUST be exactly "{{recipient_name}}" (literal placeholder).
+- signature.name defaults to "Mr Diploma" unless user specifies.
+- Do NOT include customCss unless absolutely required.
+- Available palettes: ${PALETTE_IDS.join(', ')}.
+- Available typography pairs: ${TYPOGRAPHY_IDS.join(', ')}.
+
+VARIATION SEED: ${variant}/5 — when multiple valid choices exist, lean toward variation #${variant} so repeated prompts produce different designs.
+
+Return ONLY the JSON object matching the schema.`;
 }
 
+const ITERATION_SYSTEM_PROMPT = `You are an expert diploma and certificate designer. You modify existing HTML/CSS diplomas.
+You CAN add CSS animations, decorative pseudo-elements, modify layout/colors/fonts/spacing.
+FORBIDDEN: QR codes, <img> tags, external images, markdown fences, JavaScript.
+Format response as:
+MESSAGE: [brief explanation]
+HTML: [complete HTML]
+CSS: [complete CSS]
+Make ONLY the specific changes requested.`;
 
+// ─────────────────────────────────────────────────────────────────
+// 10. PROVIDER ADAPTERS (structured output, provider-agnostic)
+// ─────────────────────────────────────────────────────────────────
+interface AIResponse { text: string; json?: any }
 
-// ── Provider adapters ──
-
-interface AIResponse { text: string }
-
-async function callAnthropic(systemPrompt: string, messages: any[], model: string, imageData?: any): Promise<AIResponse> {
+async function callAnthropic(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const body: any = {
-    model,
-    max_tokens: 4000,
-    system: systemPrompt,
-    messages,
-  };
+  const body: any = { model, max_tokens: 4000, system: systemPrompt, messages };
+  if (structured) {
+    body.tools = [{ name: 'emit_diploma_dsl', description: 'Emit the diploma DSL', input_schema: DSL_JSON_SCHEMA }];
+    body.tool_choice = { type: 'tool', name: 'emit_diploma_dsl' };
+  }
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify(body),
   });
+  if (!r.ok) throw new Error(`Anthropic API error ${r.status}: ${(await r.text()).substring(0,300)}`);
+  const data = await r.json();
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${err.substring(0, 300)}`);
+  if (structured) {
+    const toolUse = (data.content || []).find((c: any) => c.type === 'tool_use');
+    if (toolUse?.input) return { text: JSON.stringify(toolUse.input), json: toolUse.input };
   }
-
-  const data = await response.json();
-  return { text: data.content[0].text };
+  return { text: data.content?.[0]?.text || '' };
 }
 
-async function callOpenAI(systemPrompt: string, messages: any[], model: string, imageData?: any): Promise<AIResponse> {
+async function callOpenAI(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const openaiMessages: any[] = [{ role: 'system', content: systemPrompt }];
-
+  const oaiMsgs: any[] = [{ role: 'system', content: systemPrompt }];
   for (const msg of messages) {
     if (Array.isArray(msg.content)) {
-      // Handle image content
-      const parts: any[] = [];
-      for (const part of msg.content) {
-        if (part.type === 'text') {
-          parts.push({ type: 'text', text: part.text });
-        } else if (part.type === 'image') {
-          parts.push({ type: 'image_url', image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` } });
-        }
-      }
-      openaiMessages.push({ role: msg.role, content: parts });
-    } else {
-      openaiMessages.push({ role: msg.role, content: msg.content });
-    }
+      const parts = msg.content.map((p: any) =>
+        p.type === 'text' ? { type: 'text', text: p.text }
+        : { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } });
+      oaiMsgs.push({ role: msg.role, content: parts });
+    } else oaiMsgs.push({ role: msg.role, content: msg.content });
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const body: any = { model, max_tokens: 4000, messages: oaiMsgs };
+  if (structured) {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: { name: 'diploma_dsl', schema: DSL_JSON_SCHEMA, strict: false },
+    };
+  }
+
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, max_tokens: 4000, messages: openaiMessages }),
+    body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenAI API error ${response.status}: ${err.substring(0, 300)}`);
-  }
-
-  const data = await response.json();
-  return { text: data.choices[0].message.content };
+  if (!r.ok) throw new Error(`OpenAI API error ${r.status}: ${(await r.text()).substring(0,300)}`);
+  const data = await r.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  return { text };
 }
 
-async function callGemini(systemPrompt: string, messages: any[], model: string, imageData?: any): Promise<AIResponse> {
+async function callGemini(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const contents: any[] = [];
-
-  // Add system instruction as first user message context
   const allParts: any[] = [];
-
   for (const msg of messages) {
     if (Array.isArray(msg.content)) {
-      for (const part of msg.content) {
-        if (part.type === 'text') {
-          allParts.push({ text: part.text });
-        } else if (part.type === 'image') {
-          allParts.push({ inline_data: { mime_type: part.source.media_type, data: part.source.data } });
-        }
+      for (const p of msg.content) {
+        if (p.type === 'text') allParts.push({ text: p.text });
+        else if (p.type === 'image') allParts.push({ inline_data: { mime_type: p.source.media_type, data: p.source.data } });
       }
-    } else {
-      allParts.push({ text: msg.content });
-    }
+    } else allParts.push({ text: msg.content });
   }
 
-  contents.push({ role: 'user', parts: allParts });
+  const generationConfig: any = { maxOutputTokens: 4000 };
+  if (structured) {
+    generationConfig.responseMimeType = 'application/json';
+    generationConfig.responseSchema = DSL_JSON_SCHEMA;
+  }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: { maxOutputTokens: 4000 },
+      contents: [{ role: 'user', parts: allParts }],
+      generationConfig,
     }),
   });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${err.substring(0, 300)}`);
-  }
-
-  const data = await response.json();
+  if (!r.ok) throw new Error(`Gemini API error ${r.status}: ${(await r.text()).substring(0,300)}`);
+  const data = await r.json();
   return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
 }
 
-// ── Main handler ──
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// ─────────────────────────────────────────────────────────────────
+// 11. JSON extraction fallback
+// ─────────────────────────────────────────────────────────────────
+function extractJson(text: string): any {
+  let cleaned = text.replace(/```(?:json)?\s*/gi,'').replace(/```\s*/g,'').trim();
+  const s = cleaned.indexOf('{'); const e = cleaned.lastIndexOf('}');
+  if (s === -1 || e === -1) throw new Error('No JSON found');
+  cleaned = cleaned.substring(s, e+1);
+  try { return JSON.parse(cleaned); }
+  catch {
+    cleaned = cleaned.replace(/,\s*}/g,'}').replace(/,\s*]/g,']').replace(/[\x00-\x1F\x7F]/g,'');
+    return JSON.parse(cleaned);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 12. Web scrape helpers
+// ─────────────────────────────────────────────────────────────────
+const scrapeWebsiteData = async (url: string) => {
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)' } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const html = await r.text();
+    const colors = html.match(/#[0-9a-fA-F]{3,6}/g) || [];
+    const fonts = new Set<string>();
+    for (const m of html.matchAll(/font-family\s*:\s*([^;]+)/gi)) {
+      const f = m[1].replace(/['"]/g,'').split(',')[0].trim();
+      if (f && f !== 'inherit') fonts.add(f);
+    }
+    const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '';
+    const siteName = html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"/i)?.[1] || '';
+    return {
+      brandName: siteName || title.split(/[-|–—]/)[0].trim() || new URL(url).hostname.replace('www.',''),
+      colors: [...new Set(colors)].slice(0,5),
+      fonts: [...fonts].slice(0,3),
+    };
+  } catch (e) { console.error('Scrape:', e); return null; }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// 13. MAIN HANDLER
+// ─────────────────────────────────────────────────────────────────
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const { messages, requestType, imageData, url, currentHtml, currentCss, userFullName, isGuest } = await req.json();
 
-    // Auth check
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     if (!isGuest) {
@@ -428,107 +563,81 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
-      const token = authHeader.replace('Bearer ', '');
-      const { error } = await supabase.auth.getClaims(token);
-      if (error) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
+      const { error } = await supabase.auth.getClaims(authHeader.replace('Bearer ',''));
+      if (error) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Fetch active provider from app_settings
-    const { data: settingData } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'ai_provider').single();
-    const providerConfig = settingData?.value as { provider: string; model: string } || { provider: 'anthropic', model: 'claude-sonnet-4-20250514' };
-    const { provider, model } = providerConfig;
+    // Provider selection
+    const { data: settingData } = await supabaseAdmin.from('app_settings').select('value').eq('key','ai_provider').single();
+    const cfg = (settingData?.value as { provider: string; model: string }) || { provider: 'anthropic', model: 'claude-sonnet-4-20250514' };
+    const { provider, model } = cfg;
+    console.log(`Provider: ${provider}, model: ${model}`);
 
-    console.log(`Using AI provider: ${provider}, model: ${model}`);
-
-    // Determine mode: DSL (new diplomas) vs iteration (editing existing HTML/CSS)
     const isIteration = !!(currentHtml && currentCss) && requestType !== 'image' && requestType !== 'url';
+    const variant = Math.floor(Math.random() * 5) + 1; // 1..5 seed
 
     let systemPrompt: string;
     let aiMessages: any[];
+    let structured = true;
 
     if (isIteration) {
-      // ITERATION MODE: Keep old HTML/CSS approach for editing
-      systemPrompt = ITERATION_SYSTEM_PROMPT + `\n\nCURRENT HTML:\n${currentHtml}\nCURRENT CSS:\n${currentCss}\nMake only the specific changes requested.`;
-      const userMessages = (messages || []).filter((msg: any) => msg.role !== 'system');
-      aiMessages = userMessages;
+      systemPrompt = `${ITERATION_SYSTEM_PROMPT}\n\nCURRENT HTML:\n${currentHtml}\nCURRENT CSS:\n${currentCss}`;
+      aiMessages = (messages || []).filter((m: any) => m.role !== 'system');
+      structured = false;
     } else if (requestType === 'image') {
-      systemPrompt = IMAGE_SYSTEM_PROMPT;
+      systemPrompt = dslSystemPrompt(variant) + '\n\nAnalyze the image and choose blocks reflecting its style.';
       aiMessages = [{
         role: 'user',
         content: [
-          { type: 'text', text: 'Analyze this image and create a diploma design inspired by its visual style. Return JSON matching the DSL schema.' },
-          { type: 'image', source: { type: 'base64', media_type: imageData.type, data: imageData.data } }
-        ]
+          { type: 'text', text: 'Design a diploma inspired by this image.' },
+          { type: 'image', source: { type: 'base64', media_type: imageData.type, data: imageData.data } },
+        ],
       }];
     } else if (requestType === 'url') {
-      systemPrompt = URL_SYSTEM_PROMPT;
-      const websiteData = await scrapeWebsiteData(url);
-      if (websiteData) {
-        systemPrompt += `\n\nWEBSITE DATA:\n- Brand: ${websiteData.brandName}\n- Colors: ${websiteData.colors.join(', ')}\n- Fonts: ${websiteData.fonts.join(', ')}\n- Theme: ${websiteData.themeColor}`;
-      }
-      aiMessages = [{ role: 'user', content: `Create a diploma for the brand at: ${url}. Return JSON matching the DSL schema.` }];
+      const ws = await scrapeWebsiteData(url);
+      systemPrompt = dslSystemPrompt(variant) + (ws ? `\n\nBRAND: ${ws.brandName}\nColors: ${ws.colors.join(', ')}\nFonts: ${ws.fonts.join(', ')}` : '');
+      aiMessages = [{ role: 'user', content: `Create a diploma for the brand at ${url}.` }];
     } else {
-      // DSL MODE: New diploma from chat
-      systemPrompt = DSL_SYSTEM_PROMPT;
-      const userMessages = (messages || []).filter((msg: any) => msg.role !== 'system');
-      aiMessages = userMessages;
+      systemPrompt = dslSystemPrompt(variant);
+      aiMessages = (messages || []).filter((m: any) => m.role !== 'system');
     }
 
-    // Call the selected provider
+    // Call provider
     let result: AIResponse;
     switch (provider) {
-      case 'openai':
-        result = await callOpenAI(systemPrompt, aiMessages, model);
-        break;
-      case 'gemini':
-        result = await callGemini(systemPrompt, aiMessages, model);
-        break;
+      case 'openai':   result = await callOpenAI(systemPrompt, aiMessages, model, structured); break;
+      case 'gemini':   result = await callGemini(systemPrompt, aiMessages, model, structured); break;
       case 'anthropic':
-      default:
-        result = await callAnthropic(systemPrompt, aiMessages, model);
-        break;
+      default:         result = await callAnthropic(systemPrompt, aiMessages, model, structured); break;
     }
-
-    const responseText = result.text;
 
     if (isIteration) {
-      // Parse old-style MESSAGE/HTML/CSS response
-      const stripFences = (s: string) => s.replace(/```(?:html|css|)\s*/gi, '').replace(/```\s*/g, '').trim();
-      const messagePart = responseText.match(/MESSAGE:\s*(.*?)(?=HTML:|$)/s)?.[1]?.trim() || "I've updated the diploma!";
-      const htmlPart = stripFences(responseText.match(/HTML:\s*(.*?)(?=CSS:|$)/s)?.[1]?.trim() || '');
-      const cssPart = stripFences(responseText.match(/CSS:\s*(.*?)$/s)?.[1]?.trim() || '');
-
-      return new Response(JSON.stringify({ message: messagePart, html: htmlPart, css: cssPart, provider, model }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    } else {
-      // Parse DSL JSON and render
-      const dsl = extractJson(responseText);
-      console.log('DSL parsed:', JSON.stringify(dsl).substring(0, 200));
-      const rendered = renderDSL(dsl);
-
-      return new Response(JSON.stringify({
-        message: `Diploma designed with ${dsl.header?.style || 'classic'} header, ${dsl.border?.style || 'classical'} border, ${dsl.seal?.style || 'no'} seal, and ${dsl.background?.style || 'clean'} background.`,
-        html: rendered.html,
-        css: rendered.css,
-        dsl,
-        provider,
-        model,
-      }), {
+      const strip = (s: string) => s.replace(/```(?:html|css|)\s*/gi,'').replace(/```\s*/g,'').trim();
+      const msg = result.text.match(/MESSAGE:\s*(.*?)(?=HTML:|$)/s)?.[1]?.trim() || "I've updated the diploma!";
+      const htmlPart = strip(result.text.match(/HTML:\s*(.*?)(?=CSS:|$)/s)?.[1]?.trim() || '');
+      const cssPart = strip(result.text.match(/CSS:\s*(.*?)$/s)?.[1]?.trim() || '');
+      return new Response(JSON.stringify({ message: msg, html: htmlPart, css: cssPart, provider, model }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-  } catch (error) {
-    console.error('Error in generate-diploma:', error);
+    const dsl = result.json || extractJson(result.text);
+    console.log('DSL palette:', dsl.palette, 'comp:', dsl.layout?.composition, 'decos:', dsl.decorations);
+    const rendered = renderDSL(dsl);
+
     return new Response(JSON.stringify({
-      error: error.message,
-      message: 'Sorry, an error occurred while generating your diploma. Please try again.'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      message: `Designed using ${dsl.palette} palette · ${dsl.typography?.pair} typography · ${dsl.layout?.composition} layout (variant ${variant}).`,
+      html: rendered.html,
+      css: rendered.css,
+      provider,
+      model,
+      dsl,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  } catch (err: any) {
+    console.error('generate-diploma error:', err);
+    return new Response(JSON.stringify({ error: err.message, message: 'Sorry, an error occurred while generating your diploma. Please try again.' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
