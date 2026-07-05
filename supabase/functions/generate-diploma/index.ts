@@ -626,26 +626,73 @@ const isSafePublicUrl = (raw: string): boolean => {
   }
 };
 
-const scrapeWebsiteData = async (url: string) => {
+interface BrandData { brandName: string; colors: string[]; fonts: string[] }
+
+// Extract brand colors/fonts/name from raw HTML (+ optional pre-parsed metadata)
+const extractBrandFromHtml = (
+  html: string,
+  url: string,
+  meta?: { title?: string; siteName?: string },
+): BrandData => {
+  const colors = html.match(/#[0-9a-fA-F]{3,6}/g) || [];
+  const fonts = new Set<string>();
+  for (const m of html.matchAll(/font-family\s*:\s*([^;]+)/gi)) {
+    const f = m[1].replace(/['"]/g, '').split(',')[0].trim();
+    if (f && f !== 'inherit') fonts.add(f);
+  }
+  const title = meta?.title || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '';
+  const siteName = meta?.siteName || html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"/i)?.[1] || '';
+  return {
+    brandName: siteName || title.split(/[-|–—]/)[0].trim() || new URL(url).hostname.replace('www.', ''),
+    colors: [...new Set(colors)].slice(0, 5),
+    fonts: [...fonts].slice(0, 3),
+  };
+};
+
+// Scrape via Firecrawl (renders JS, cleaner metadata); returns null if unavailable/failed
+const scrapeWithFirecrawl = async (url: string): Promise<BrandData | null> => {
+  const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!apiKey) return null;
   try {
-    if (!isSafePublicUrl(url)) throw new Error('URL is not a public http(s) address');
+    const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ url, formats: ['html'], onlyMainContent: false, timeout: 20000 }),
+    });
+    if (!r.ok) throw new Error(`Firecrawl HTTP ${r.status}: ${(await r.text()).substring(0, 200)}`);
+    const data = await r.json();
+    if (!data?.success || !data?.data) throw new Error('Firecrawl returned no data');
+    const html: string = data.data.html || data.data.rawHtml || '';
+    const md = data.data.metadata || {};
+    return extractBrandFromHtml(html, url, {
+      title: md.title || md.ogTitle,
+      siteName: md.ogSiteName || md['og:site_name'],
+    });
+  } catch (e) {
+    console.error('Firecrawl scrape failed, falling back:', e instanceof Error ? e.message : e);
+    return null;
+  }
+};
+
+// Direct fetch fallback (no JS rendering)
+const scrapeDirect = async (url: string): Promise<BrandData | null> => {
+  try {
     const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)' } });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const html = await r.text();
-    const colors = html.match(/#[0-9a-fA-F]{3,6}/g) || [];
-    const fonts = new Set<string>();
-    for (const m of html.matchAll(/font-family\s*:\s*([^;]+)/gi)) {
-      const f = m[1].replace(/['"]/g,'').split(',')[0].trim();
-      if (f && f !== 'inherit') fonts.add(f);
-    }
-    const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '';
-    const siteName = html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"/i)?.[1] || '';
-    return {
-      brandName: siteName || title.split(/[-|–—]/)[0].trim() || new URL(url).hostname.replace('www.',''),
-      colors: [...new Set(colors)].slice(0,5),
-      fonts: [...fonts].slice(0,3),
-    };
-  } catch (e) { console.error('Scrape:', e); return null; }
+    return extractBrandFromHtml(await r.text(), url);
+  } catch (e) {
+    console.error('Direct scrape failed:', e instanceof Error ? e.message : e);
+    return null;
+  }
+};
+
+const scrapeWebsiteData = async (url: string): Promise<BrandData | null> => {
+  if (!isSafePublicUrl(url)) {
+    console.error('Scrape: URL is not a public http(s) address');
+    return null;
+  }
+  // Prefer Firecrawl when configured; fall back to a direct fetch.
+  return (await scrapeWithFirecrawl(url)) || (await scrapeDirect(url));
 };
 
 // ─────────────────────────────────────────────────────────────────
