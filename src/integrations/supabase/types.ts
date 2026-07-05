@@ -42,6 +42,7 @@ export type Database = {
         Row: {
           created_at: string
           diploma_css: string
+          diploma_dsl: Json | null
           diploma_format: string
           diploma_html: string
           id: string
@@ -53,6 +54,7 @@ export type Database = {
         Insert: {
           created_at?: string
           diploma_css?: string
+          diploma_dsl?: Json | null
           diploma_format?: string
           diploma_html?: string
           id?: string
@@ -64,6 +66,7 @@ export type Database = {
         Update: {
           created_at?: string
           diploma_css?: string
+          diploma_dsl?: Json | null
           diploma_format?: string
           diploma_html?: string
           id?: string
@@ -71,6 +74,24 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      guest_usage: {
+        Row: {
+          count: number
+          ip_hash: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          ip_hash: string
+          window_start?: string
+        }
+        Update: {
+          count?: number
+          ip_hash?: string
+          window_start?: string
         }
         Relationships: []
       }
