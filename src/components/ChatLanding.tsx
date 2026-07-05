@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useGeneration } from '@/hooks/useGeneration';
 import { GenerationToolbar } from '@/components/GenerationToolbar';
+import { RecipeGallery } from '@/components/RecipeGallery';
 
 interface ChatLandingProps {
   isGuest?: boolean;
@@ -45,23 +46,10 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
           <p className="text-muted-foreground text-sm max-w-md mx-auto">Describe your vision, upload an image, or let the AI design it for you.</p>
         </div>
 
-        {/* Quick-start suggestion chips */}
-        <div className="flex flex-wrap justify-center gap-2">
-          {[
-            'Modern minimalist university diploma',
-            'Elegant gold-bordered certificate',
-            'Tech bootcamp completion certificate',
-            'Professional course diploma',
-          ].map((suggestion) => (
-            <button
-              key={suggestion}
-              onClick={() => { setMessage(suggestion); }}
-              disabled={isGenerating}
-              className="px-3 py-1.5 text-xs rounded-full border border-border bg-card hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-            >
-              {suggestion}
-            </button>
-          ))}
+        {/* Visual recipe gallery — pick a style to generate from, or describe your own below */}
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">Pick a style to start — or describe your own below.</p>
+          <RecipeGallery onPick={generateFromText} disabled={isGenerating} />
         </div>
 
         <div className="relative bg-card border border-border rounded-2xl shadow-lg shadow-black/20">
