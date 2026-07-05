@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { Award, ExternalLink, Shield, Calendar, QrCode, Copy, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
+import { DiplomaFrame } from '@/components/DiplomaFrame';
 import { toast } from 'sonner';
 
 interface SealData {
@@ -26,33 +28,33 @@ const parseSeal = (raw: string): SealData | null => {
 
 const Diploma = () => {
   const { diplomaId } = useParams();
-  const [diplomaData, setDiplomaData] = useState<any>(null);
+  const [diplomaData, setDiplomaData] = useState<Tables<'signed_diplomas'> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [sealOpen, setSealOpen] = useState(false);
 
   useEffect(() => {
-    if (diplomaId) fetchDiplomaData();
+    if (!diplomaId) return;
+    const fetchDiplomaData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('signed_diplomas')
+          .select('*')
+          .eq('blockchain_id', diplomaId)
+          .maybeSingle();
+
+        if (error) { setError(`Database error: ${error.message}`); return; }
+        if (!data) { setError('Diploma not found'); return; }
+        setDiplomaData(data);
+      } catch {
+        setError('Unexpected error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDiplomaData();
   }, [diplomaId]);
-
-  const fetchDiplomaData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('signed_diplomas')
-        .select('*')
-        .eq('blockchain_id', diplomaId)
-        .maybeSingle();
-
-      if (error) { setError(`Database error: ${error.message}`); return; }
-      if (!data) { setError('Diploma not found'); return; }
-      setDiplomaData(data);
-    } catch {
-      setError('Unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const copyLink = async () => {
     try {
@@ -113,10 +115,10 @@ const Diploma = () => {
       <main className="flex-1 flex items-start justify-center p-4 md:p-8">
         <div className="w-full max-w-5xl space-y-4">
           <div className="bg-card rounded-lg shadow-lg border overflow-hidden">
-            <div
-              dangerouslySetInnerHTML={{
-                __html: `<style>${diplomaData.diploma_css}</style>${diplomaData.diploma_html}`,
-              }}
+            <DiplomaFrame
+              html={diplomaData.diploma_html}
+              css={diplomaData.diploma_css}
+              title={`Diploma for ${diplomaData.recipient_name}`}
             />
           </div>
 

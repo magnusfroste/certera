@@ -29,7 +29,7 @@ export const ChatPanel = ({ isGuest, guestAccess }: ChatPanelProps) => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -44,7 +44,7 @@ export const ChatPanel = ({ isGuest, guestAccess }: ChatPanelProps) => {
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Describe changes or a new diploma..."
             className="border-0 shadow-none focus-visible:ring-0 resize-none min-h-[60px] rounded-xl pb-10 bg-transparent text-foreground placeholder:text-muted-foreground"
             rows={3}

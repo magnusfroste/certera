@@ -69,6 +69,8 @@ export const GenerationToolbar = ({
             size="sm"
             className={`${buttonSize} p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors`}
             disabled={isGenerating}
+            aria-label="Generate from an uploaded image"
+            title="Generate from image"
           >
             <Upload className={iconSize} />
           </Button>
@@ -99,6 +101,8 @@ export const GenerationToolbar = ({
             size="sm"
             className={`${buttonSize} p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors`}
             disabled={isGenerating}
+            aria-label="Generate from a website URL"
+            title="Generate from website"
           >
             <Link className={iconSize} />
           </Button>
@@ -129,6 +133,8 @@ export const GenerationToolbar = ({
         className={`${buttonSize} p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors`}
         onClick={handleRandomPrompt}
         disabled={isGenerating}
+        aria-label="Fill in a random example prompt"
+        title="Surprise me"
       >
         <Wand2 className={iconSize} />
       </Button>

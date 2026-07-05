@@ -100,7 +100,8 @@ export function AppSidebar({ userEmail, userName }: AppSidebarProps) {
   useEffect(() => {
     fetchSessions();
     if (userEmail) fetchProfile();
-  }, [currentSessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId, userEmail]);
 
   const fetchProfile = async () => {
     try {
@@ -112,7 +113,9 @@ export function AppSidebar({ userEmail, userName }: AppSidebarProps) {
         .eq('id', user.id)
         .single();
       if (data?.name) setProfileName(data.name);
-    } catch {}
+    } catch (error) {
+      console.error('Failed to fetch profile name:', error);
+    }
   };
 
   const fetchSessions = async () => {

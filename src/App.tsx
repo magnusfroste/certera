@@ -9,7 +9,7 @@ import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import HealthCheck from "./pages/HealthCheck";
 
-function lazyRetry(importFn: () => Promise<any>, retries = 3, delay = 1500): Promise<any> {
+function lazyRetry<T>(importFn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
   return new Promise((resolve, reject) => {
     importFn()
       .then(resolve)
@@ -32,7 +32,6 @@ const Profile = lazy(() => lazyRetry(() => import("./pages/Profile")));
 const Signed = lazy(() => lazyRetry(() => import("./pages/Signed")));
 const Diploma = lazy(() => lazyRetry(() => import("./pages/Diploma")));
 const DiplomaEmbed = lazy(() => lazyRetry(() => import("./pages/DiplomaEmbed")));
-const TestDiploma = lazy(() => lazyRetry(() => import("./pages/TestDiploma")));
 const Verify = lazy(() => lazyRetry(() => import("./pages/Verify")));
 const AdminDashboard = lazy(() => lazyRetry(() => import("./pages/AdminDashboard")));
 const DSLExplorer = lazy(() => lazyRetry(() => import("./pages/DSLExplorer")));
@@ -75,7 +74,6 @@ const App = () => {
                 <Route path="/signed" element={<Signed />} />
                 <Route path="/diploma/:diplomaId" element={<Diploma />} />
                 <Route path="/embed/:diplomaId" element={<DiplomaEmbed />} />
-                <Route path="/testdiploma/:diplomaId" element={<TestDiploma />} />
                 <Route path="/verify/:diplomaId?" element={<Verify />} />
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/dsl" element={<DSLExplorer />} />

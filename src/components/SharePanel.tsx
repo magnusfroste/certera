@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Share2, Copy, Check, QrCode, Loader2 } from 'lucide-react';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { supabase } from '@/integrations/supabase/client';
+import { createContentHash, DIPLOMA_SIGNED_EVENT } from '@/services/blockchainService';
+import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
@@ -28,52 +30,50 @@ export const SharePanel = () => {
   const [isSignedDiploma, setIsSignedDiploma] = useState(false);
 
   useEffect(() => {
-    const fetchLastDiplomaUrl = async () => {
+    let cancelled = false;
+
+    // Look up the signed record matching the diploma that is on screen
+    // (by content hash) — not just the user's most recently signed diploma.
+    const fetchSignedDiploma = async () => {
       try {
+        if (!diplomaHtml && !diplomaCss) return;
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data, error } = await supabase
+        const contentHash = await createContentHash(diplomaHtml, diplomaCss);
+        const { data } = await supabase
           .from('signed_diplomas')
           .select('diploma_url, blockchain_id')
           .eq('issuer_id', user.id)
+          .eq('content_hash', contentHash)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (data && data.diploma_url) {
+        if (cancelled) return;
+        if (data?.diploma_url) {
           setDiplomaUrl(data.diploma_url);
           setCurrentDiplomaId(data.blockchain_id);
           setIsSignedDiploma(true);
         } else {
-          const savedDiplomaUrl = sessionStorage.getItem('lastDiplomaUrl');
-          const savedDiplomaId = sessionStorage.getItem('lastDiplomaId');
-          if (savedDiplomaUrl && savedDiplomaId) {
-            setDiplomaUrl(savedDiplomaUrl);
-            setCurrentDiplomaId(savedDiplomaId);
-            setIsSignedDiploma(true);
-          } else {
-            setDiplomaUrl(window.location.href);
-            setIsSignedDiploma(false);
-          }
+          setDiplomaUrl(window.location.href);
+          setCurrentDiplomaId('');
+          setIsSignedDiploma(false);
         }
       } catch (error) {
         console.error('Error fetching diploma URL:', error);
-        const savedDiplomaUrl = sessionStorage.getItem('lastDiplomaUrl');
-        const savedDiplomaId = sessionStorage.getItem('lastDiplomaId');
-        if (savedDiplomaUrl && savedDiplomaId) {
-          setDiplomaUrl(savedDiplomaUrl);
-          setCurrentDiplomaId(savedDiplomaId);
-          setIsSignedDiploma(true);
-        } else {
-          setDiplomaUrl(window.location.href);
-          setIsSignedDiploma(false);
-        }
       }
     };
 
-    fetchLastDiplomaUrl();
-  }, []);
+    fetchSignedDiploma();
+    // Refresh when the user signs the current diploma
+    window.addEventListener(DIPLOMA_SIGNED_EVENT, fetchSignedDiploma);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(DIPLOMA_SIGNED_EVENT, fetchSignedDiploma);
+    };
+  }, [diplomaHtml, diplomaCss]);
 
   const shareUrl = diplomaUrl || window.location.href;
   const shareTitle = "Check out my diploma created with Diploma Generator!";
@@ -143,16 +143,24 @@ export const SharePanel = () => {
                 level: 'M'
               })
             );
-            
-            setTimeout(() => {
+
+            // Poll for the rendered SVG instead of a single fixed timeout,
+            // so slow devices don't end up with an empty QR box in the PDF.
+            const startedAt = Date.now();
+            const tryGrabQr = () => {
               const qrSvg = qrTempDiv.querySelector('svg');
+              if (!qrSvg && Date.now() - startedAt < 2000) {
+                setTimeout(tryGrabQr, 50);
+                return;
+              }
               if (qrSvg) {
                 qrContainer.appendChild(qrSvg.cloneNode(true));
               }
               root.unmount();
               document.body.removeChild(qrTempDiv);
               resolve();
-            }, 100);
+            };
+            setTimeout(tryGrabQr, 50);
           });
         }
       }
@@ -196,6 +204,7 @@ export const SharePanel = () => {
       document.body.removeChild(tempDiv);
     } catch (error) {
       console.error('Error generating PDF:', error);
+      toast.error('Could not generate the PDF. Please try again.');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -208,6 +217,7 @@ export const SharePanel = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
+      toast.error('Could not copy the link to your clipboard.');
     }
   };
 
@@ -225,16 +235,16 @@ export const SharePanel = () => {
       <CardContent className="space-y-6">
         {/* Status Info */}
         {hasContent && !isSignedDiploma && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-sm text-foreground">
               💡 Sign your diploma to the blockchain first to get a shareable link and QR code
             </p>
           </div>
         )}
 
         {isSignedDiploma && currentDiplomaId && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
               ✅ This is a verified blockchain diploma with QR verification
             </p>
           </div>

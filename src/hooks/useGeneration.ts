@@ -13,7 +13,7 @@ interface GuestAccess {
 
 function createMessage(content: string, isUser: boolean): Message {
   return {
-    id: (Date.now() + (isUser ? 0 : 1)).toString(),
+    id: crypto.randomUUID(),
     content,
     isUser,
     timestamp: new Date(),
@@ -65,7 +65,6 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
 
       try {
         const chatMessages: ChatMessage[] = messages
-          .filter((m) => m.id !== '1')
           .map((msg) => ({
             role: msg.isUser ? ('user' as const) : ('assistant' as const),
             content: msg.content,

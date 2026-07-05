@@ -26,7 +26,7 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -68,7 +68,7 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Describe the diploma you want to create..."
             className="border-0 shadow-none focus-visible:ring-0 resize-none min-h-[100px] rounded-2xl pb-14 bg-transparent text-foreground placeholder:text-muted-foreground"
             rows={3}

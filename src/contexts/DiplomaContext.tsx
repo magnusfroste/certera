@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface DiplomaFields {
   recipientName: string;
@@ -51,7 +52,10 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [signingRecipientName, setSigningRecipientName] = useState('');
   const [signingInstitutionName, setSigningInstitutionName] = useState('');
-  const [diplomaFormat, setDiplomaFormat] = useState<'portrait' | 'landscape'>('portrait');
+  const [diplomaFormat, setDiplomaFormat] = useState<'portrait' | 'landscape'>(() => {
+    const saved = localStorage.getItem('diplomaFormat');
+    return saved === 'landscape' || saved === 'portrait' ? saved : 'portrait';
+  });
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [diplomaFields, setDiplomaFields] = useState<DiplomaFields>(EMPTY_FIELDS);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -86,7 +90,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     const sessionId = sessionIdRef.current;
 
     if (sessionId) {
-      await supabase
+      const { error } = await supabase
         .from('diploma_sessions')
         .update({
           diploma_html: html,
@@ -96,8 +100,12 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
           title: title || 'Untitled Diploma',
         })
         .eq('id', sessionId);
+      if (error) {
+        console.error('Failed to save session:', error);
+        toast.error('Could not save your session. Your latest changes may be lost.');
+      }
     } else {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('diploma_sessions')
         .insert({
           diploma_html: html,
@@ -109,7 +117,15 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
         })
         .select('id')
         .single();
-      if (data) setCurrentSessionId(data.id);
+      if (error) {
+        console.error('Failed to create session:', error);
+        toast.error('Could not save your session. Your latest changes may be lost.');
+      } else if (data) {
+        // Update the ref synchronously so a save racing this one doesn't
+        // also see a null session id and insert a duplicate row.
+        sessionIdRef.current = data.id;
+        setCurrentSessionId(data.id);
+      }
     }
   }, []); // No deps needed — reads from refs
 
@@ -131,14 +147,18 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   // ── Reset session (guarded) ──
   const resetSession = useCallback(() => {
     isResettingRef.current = true;
+    // Clear the ref synchronously so in-flight saves don't write to the old session
+    sessionIdRef.current = null;
     setCurrentSessionId(null);
     setDiplomaHtml('');
     setDiplomaCss('');
-    setDiplomaFormat('portrait');
+    const saved = localStorage.getItem('diplomaFormat');
+    setDiplomaFormat(saved === 'landscape' || saved === 'portrait' ? saved : 'portrait');
     setDiplomaFields(EMPTY_FIELDS);
     setMessages([]);
-    // Allow saves again after React flushes the reset
-    requestAnimationFrame(() => { isResettingRef.current = false; });
+    // Allow saves again after React flushes the reset. setTimeout (not rAF)
+    // so the guard also clears in backgrounded tabs where rAF is throttled.
+    setTimeout(() => { isResettingRef.current = false; }, 0);
   }, []);
 
   // ── Load session ──
@@ -148,8 +168,15 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
       .select('*')
       .eq('id', id)
       .single();
-    if (error || !data) return;
+    if (error || !data) {
+      if (error) {
+        console.error('Failed to load session:', error);
+        toast.error('Could not load that session.');
+      }
+      return;
+    }
 
+    sessionIdRef.current = data.id;
     setCurrentSessionId(data.id);
     setDiplomaHtml(data.diploma_html);
     setDiplomaCss(data.diploma_css);
@@ -157,7 +184,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
 
     const savedMessages = data.messages as unknown;
     if (Array.isArray(savedMessages) && savedMessages.length > 0) {
-      setMessages(savedMessages.map((m: any) => ({
+      setMessages((savedMessages as Array<Omit<Message, 'timestamp'> & { timestamp: string }>).map((m) => ({
         ...m,
         timestamp: new Date(m.timestamp),
       })));

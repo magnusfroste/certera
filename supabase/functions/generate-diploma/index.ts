@@ -7,6 +7,50 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// Escape user/model-provided strings before interpolating into diploma HTML.
+function esc(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ── Shared request/DSL types ──
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: string; media_type: string; data: string } };
+
+interface AIMessage {
+  role: string;
+  content: string | ContentPart[];
+}
+
+interface DiplomaDSL {
+  palette?: string;
+  typography?: { pair?: string };
+  layout?: { orientation?: string; padding?: string; composition?: string };
+  decorations?: string[];
+  header?: { style?: string; institutionName?: string; subtitle?: string };
+  border?: { style?: string; color?: string };
+  body?: {
+    title?: string;
+    preText?: string;
+    recipientName?: string;
+    description?: string;
+    date?: string;
+    courseOrProgram?: string;
+    additionalFields?: { label?: string; value?: string }[];
+  };
+  seal?: { style?: string; position?: string; text?: string };
+  signature?: { style?: string; name?: string; title?: string };
+  footer?: { additionalText?: string; verificationUrl?: string };
+  brand?: { primaryColor?: string; accentColor?: string };
+  background?: { style?: string };
+  customCss?: string;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // 1. PALETTES (curated, kontrast-garanterad)
 // ─────────────────────────────────────────────────────────────────
@@ -157,7 +201,7 @@ function getHeaderCss(style: string, color: string, headingFont: string): string
 
 function getSealHtmlCss(style: string, color: string, text?: string): {html:string;css:string} {
   if (!style || style === 'none') return {html:'',css:''};
-  const t = text || 'VERIFIED';
+  const t = esc(text || 'VERIFIED');
   const map: Record<string, {html:string;css:string}> = {
     'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:2px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'star': {css:`.diploma-seal{width:80px;height:80px;background:${color};clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);display:flex;align-items:center;justify-content:center;color:white;font-size:20px}`,html:`<div class="diploma-seal">★</div>`},
@@ -171,7 +215,9 @@ function getSealHtmlCss(style: string, color: string, text?: string): {html:stri
   return map[style] || map['classical-round'];
 }
 
-function getSignatureHtmlCss(style: string, name: string, title: string | undefined, color: string, scriptFont: string, headingFont: string): {html:string;css:string} {
+function getSignatureHtmlCss(style: string, rawName: string, rawTitle: string | undefined, color: string, scriptFont: string, headingFont: string): {html:string;css:string} {
+  const name = esc(rawName);
+  const title = rawTitle ? esc(rawTitle) : undefined;
   const map: Record<string, {html:string;css:string}> = {
     'handwriting': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-name{font-family:${scriptFont};font-size:28px;color:${color};border-bottom:1px solid ${color}40;padding-bottom:4px;display:inline-block}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:4px}`,html:`<div class="diploma-signature"><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
     'formal': {css:`.diploma-signature{text-align:center}.diploma-signature .sig-line{width:200px;border-bottom:1px solid ${color};margin:0 auto 6px}.diploma-signature .sig-name{font-family:${headingFont};font-size:16px;color:${color};font-weight:bold}.diploma-signature .sig-title{font-size:11px;color:#888;margin-top:2px}`,html:`<div class="diploma-signature"><div class="sig-line"></div><div class="sig-name">${name}</div>${title?`<div class="sig-title">${title}</div>`:''}</div>`},
@@ -212,12 +258,15 @@ function sanitizeCustomCss(css: string): string {
 // ─────────────────────────────────────────────────────────────────
 // 7. RENDER
 // ─────────────────────────────────────────────────────────────────
-function renderDSL(dsl: any): {html:string;css:string} {
+function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   // Palette resolution
   const paletteId = dsl.palette || 'ivory-navy';
   const palette = PALETTES[paletteId] || PALETTES['ivory-navy'];
-  const pc = dsl.brand?.primaryColor || palette.primary;
-  const ac = dsl.brand?.accentColor || palette.accent;
+  // Colors are interpolated into CSS — only accept hex values
+  const safeColor = (c: unknown, fallback: string): string =>
+    typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : fallback;
+  const pc = safeColor(dsl.brand?.primaryColor, palette.primary);
+  const ac = safeColor(dsl.brand?.accentColor, palette.accent);
   const bgKey = dsl.background?.style || palette.bg;
   const bgCss = BG_STYLES[bgKey] || BG_STYLES['clean-white'];
   const isLight = palette.text === 'light';
@@ -227,26 +276,29 @@ function renderDSL(dsl: any): {html:string;css:string} {
   const typ = TYPOGRAPHY[typId] || TYPOGRAPHY['serif-classic'];
 
   // Layout
-  const pad = ({compact:'24px',normal:'40px',spacious:'60px'} as any)[dsl.layout?.padding] || '40px';
+  const PADDINGS: Record<string, string> = { compact: '24px', normal: '40px', spacious: '60px' };
+  const pad = PADDINGS[dsl.layout?.padding ?? ''] || '40px';
   const composition: Composition = (dsl.layout?.composition as Composition) || 'classic-stack';
-  const compClass = ({
+  const COMP_CLASSES: Record<string, string> = {
     'classic-stack':'',
     'banner-top':'comp-banner',
     'medallion-center':'comp-medallion',
     'split-horizontal':'comp-split',
     'corner-accent':'comp-corner',
-  } as any)[composition] || '';
+  };
+  const compClass = COMP_CLASSES[composition] || '';
 
   // Decorations
-  const decos: string[] = Array.isArray(dsl.decorations) ? dsl.decorations.slice(0,2) : [];
-  const decoClasses = decos.map(d => ({
+  const DECO_CLASSES: Record<string, string> = {
     'corner-flourishes':'deco-flourish',
     'watermark-monogram':'deco-watermark',
     'ribbon-banner':'deco-ribbon',
     'guilloche-pattern':'deco-guilloche',
     'laurel-side':'deco-laurel',
     'subtle-grid':'deco-grid',
-  } as any)[d]).filter(Boolean).join(' ');
+  };
+  const decos: string[] = Array.isArray(dsl.decorations) ? dsl.decorations.slice(0,2) : [];
+  const decoClasses = decos.map(d => DECO_CLASSES[d]).filter(Boolean).join(' ');
 
   // Text colors (adaptive)
   const t = isLight
@@ -256,7 +308,7 @@ function renderDSL(dsl: any): {html:string;css:string} {
   const cssParts = [
     `@import url('https://fonts.googleapis.com/css2?${typ.gfont}&display=swap');`,
     `.diploma-container{max-width:800px;width:100%;margin:0 auto;padding:${pad};box-sizing:border-box;overflow:hidden;font-family:${typ.body};color:${t.body};${bgCss}}`,
-    getBorderCss(dsl.border?.style || 'classical', dsl.border?.color || pc),
+    getBorderCss(dsl.border?.style || 'classical', safeColor(dsl.border?.color, pc)),
     `.diploma-border{overflow:visible;position:relative}`,
     getHeaderCss(dsl.header?.style || 'serif-centered', pc, typ.heading),
     `.diploma-body{text-align:center;margin:1.2em 0}.diploma-body .diploma-title{font-family:${typ.heading};font-size:32px;font-weight:bold;color:${pc};margin-bottom:0.8em;letter-spacing:2px;text-transform:uppercase}.diploma-body .diploma-pretext{font-family:${typ.body};font-size:14px;color:${t.ter};margin-bottom:0.5em;font-style:italic}.diploma-body .diploma-recipient{font-family:${typ.script};font-size:42px;color:${pc};margin:0.3em 0;border-bottom:2px solid ${ac}40;display:inline-block;padding:0 20px 4px}.diploma-body .diploma-description{font-family:${typ.body};font-size:15px;color:${t.sec};max-width:600px;margin:1em auto;line-height:1.6}.diploma-body .diploma-course{font-family:${typ.heading};font-size:18px;font-weight:bold;color:${pc};margin:0.5em 0}.diploma-body .diploma-date{font-size:13px;color:${t.mut};margin-top:1em}.diploma-body .diploma-fields{margin-top:1em;font-size:13px;color:${t.ter}}.diploma-body .diploma-fields .field-label{font-weight:bold;color:${t.sec}}`,
@@ -267,11 +319,12 @@ function renderDSL(dsl: any): {html:string;css:string} {
   const seal = getSealHtmlCss(dsl.seal?.style || 'none', ac, dsl.seal?.text);
   if (seal.css) cssParts.push(seal.css);
   if (dsl.seal && dsl.seal.style !== 'none') {
-    const pos = ({
+    const SEAL_POSITIONS: Record<string, string> = {
       'bottom-right':'justify-content:flex-end',
       'bottom-left':'justify-content:flex-start',
       'bottom-center':'justify-content:center',
-    } as any)[dsl.seal.position] || 'justify-content:flex-end';
+    };
+    const pos = SEAL_POSITIONS[dsl.seal.position ?? ''] || 'justify-content:flex-end';
     cssParts.push(`.diploma-seal-wrapper{display:flex;${pos};margin-top:1em}`);
   }
 
@@ -282,15 +335,16 @@ function renderDSL(dsl: any): {html:string;css:string} {
   const cleanCustom = sanitizeCustomCss(dsl.customCss || '');
   if (cleanCustom) cssParts.push(cleanCustom);
 
-  // Build HTML
+  // Build HTML (all model/user-provided text is escaped)
   const hasSeal = !!seal.html && dsl.seal?.style !== 'none';
-  const fields = (dsl.body?.additionalFields||[]).map((f:any)=>`<div><span class="field-label">${f.label}:</span> ${f.value}</div>`).join('');
+  const fields = (dsl.body?.additionalFields||[]).map(f=>`<div><span class="field-label">${esc(f.label)}:</span> ${esc(f.value)}</div>`).join('');
   const wrapperClasses = ['diploma-container', compClass, decoClasses].filter(Boolean).join(' ');
 
-  const headerHtml = `<div class="diploma-header"><div class="institution">${dsl.header?.institutionName||'Institution'}</div>${dsl.header?.subtitle?`<div class="subtitle">${dsl.header.subtitle}</div>`:''}</div>`;
-  const bodyHtml = `<div class="diploma-body"><div class="diploma-title">${dsl.body?.title||'Certificate'}</div>${dsl.body?.preText?`<div class="diploma-pretext">${dsl.body.preText}</div>`:''}<div class="diploma-recipient">${dsl.body?.recipientName||'Recipient Name'}</div><div class="diploma-description">${dsl.body?.description||''}</div>${dsl.body?.courseOrProgram?`<div class="diploma-course">${dsl.body.courseOrProgram}</div>`:''}${fields?`<div class="diploma-fields">${fields}</div>`:''}${dsl.body?.date?`<div class="diploma-date">${dsl.body.date}</div>`:''}</div>`;
+  const headerHtml = `<div class="diploma-header"><div class="institution">${esc(dsl.header?.institutionName||'Institution')}</div>${dsl.header?.subtitle?`<div class="subtitle">${esc(dsl.header.subtitle)}</div>`:''}</div>`;
+  const bodyHtml = `<div class="diploma-body"><div class="diploma-title">${esc(dsl.body?.title||'Certificate')}</div>${dsl.body?.preText?`<div class="diploma-pretext">${esc(dsl.body.preText)}</div>`:''}<div class="diploma-recipient">${esc(dsl.body?.recipientName||'Recipient Name')}</div><div class="diploma-description">${esc(dsl.body?.description||'')}</div>${dsl.body?.courseOrProgram?`<div class="diploma-course">${esc(dsl.body.courseOrProgram)}</div>`:''}${fields?`<div class="diploma-fields">${fields}</div>`:''}${dsl.body?.date?`<div class="diploma-date">${esc(dsl.body.date)}</div>`:''}</div>`;
   const bottomHtml = `<div class="diploma-bottom-row${hasSeal?'':' no-seal'}">${sig.html}${hasSeal?`<div class="diploma-seal-wrapper">${seal.html}</div>`:''}</div>`;
-  const footerHtml = dsl.footer?`<div class="diploma-footer">${dsl.footer.additionalText?`<div>${dsl.footer.additionalText}</div>`:''}${dsl.footer.verificationUrl?`<div><a href="${dsl.footer.verificationUrl}">Verify</a></div>`:''}</div>`:'';
+  const verifyHref = /^https?:\/\//i.test(dsl.footer?.verificationUrl ?? '') ? esc(dsl.footer!.verificationUrl) : '';
+  const footerHtml = dsl.footer?`<div class="diploma-footer">${dsl.footer.additionalText?`<div>${esc(dsl.footer.additionalText)}</div>`:''}${verifyHref?`<div><a href="${verifyHref}">Verify</a></div>`:''}</div>`:'';
 
   const inner = composition === 'split-horizontal'
     ? `${headerHtml}<div class="comp-split-content">${bodyHtml}${bottomHtml}${footerHtml}</div>`
@@ -414,13 +468,13 @@ Make ONLY the specific changes requested.`;
 // ─────────────────────────────────────────────────────────────────
 // 10. PROVIDER ADAPTERS (structured output, provider-agnostic)
 // ─────────────────────────────────────────────────────────────────
-interface AIResponse { text: string; json?: any }
+interface AIResponse { text: string; json?: DiplomaDSL }
 
-async function callAnthropic(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
+async function callAnthropic(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const body: any = { model, max_tokens: 4000, system: systemPrompt, messages };
+  const body: Record<string, unknown> = { model, max_tokens: 4000, system: systemPrompt, messages };
   if (structured) {
     body.tools = [{ name: 'emit_diploma_dsl', description: 'Emit the diploma DSL', input_schema: DSL_JSON_SCHEMA }];
     body.tool_choice = { type: 'tool', name: 'emit_diploma_dsl' };
@@ -435,27 +489,30 @@ async function callAnthropic(systemPrompt: string, messages: any[], model: strin
   const data = await r.json();
 
   if (structured) {
-    const toolUse = (data.content || []).find((c: any) => c.type === 'tool_use');
+    const toolUse = (data.content || []).find((c: { type: string; input?: DiplomaDSL }) => c.type === 'tool_use');
     if (toolUse?.input) return { text: JSON.stringify(toolUse.input), json: toolUse.input };
   }
   return { text: data.content?.[0]?.text || '' };
 }
 
-async function callOpenAI(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-
-  const oaiMsgs: any[] = [{ role: 'system', content: systemPrompt }];
+function toOpenAIMessages(systemPrompt: string, messages: AIMessage[]): Array<{ role: string; content: unknown }> {
+  const oaiMsgs: Array<{ role: string; content: unknown }> = [{ role: 'system', content: systemPrompt }];
   for (const msg of messages) {
     if (Array.isArray(msg.content)) {
-      const parts = msg.content.map((p: any) =>
+      const parts = msg.content.map((p) =>
         p.type === 'text' ? { type: 'text', text: p.text }
         : { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } });
       oaiMsgs.push({ role: msg.role, content: parts });
     } else oaiMsgs.push({ role: msg.role, content: msg.content });
   }
+  return oaiMsgs;
+}
 
-  const body: any = { model, max_tokens: 4000, messages: oaiMsgs };
+async function callOpenAI(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+
+  const body: Record<string, unknown> = { model, max_tokens: 4000, messages: toOpenAIMessages(systemPrompt, messages) };
   if (structured) {
     body.response_format = {
       type: 'json_schema',
@@ -474,11 +531,11 @@ async function callOpenAI(systemPrompt: string, messages: any[], model: string, 
   return { text };
 }
 
-async function callGemini(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
+async function callGemini(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const allParts: any[] = [];
+  const allParts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [];
   for (const msg of messages) {
     if (Array.isArray(msg.content)) {
       for (const p of msg.content) {
@@ -488,7 +545,7 @@ async function callGemini(systemPrompt: string, messages: any[], model: string, 
     } else allParts.push({ text: msg.content });
   }
 
-  const generationConfig: any = { maxOutputTokens: 4000 };
+  const generationConfig: Record<string, unknown> = { maxOutputTokens: 4000 };
   if (structured) {
     generationConfig.responseMimeType = 'application/json';
     generationConfig.responseSchema = DSL_JSON_SCHEMA;
@@ -507,21 +564,11 @@ async function callGemini(systemPrompt: string, messages: any[], model: string, 
   return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
 }
 
-async function callOpenRouter(systemPrompt: string, messages: any[], model: string, structured: boolean): Promise<AIResponse> {
+async function callOpenRouter(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('OPENROUTER_API_KEY');
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
 
-  const oaiMsgs: any[] = [{ role: 'system', content: systemPrompt }];
-  for (const msg of messages) {
-    if (Array.isArray(msg.content)) {
-      const parts = msg.content.map((p: any) =>
-        p.type === 'text' ? { type: 'text', text: p.text }
-        : { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } });
-      oaiMsgs.push({ role: msg.role, content: parts });
-    } else oaiMsgs.push({ role: msg.role, content: msg.content });
-  }
-
-  const body: any = { model, max_tokens: 4000, messages: oaiMsgs };
+  const body: Record<string, unknown> = { model, max_tokens: 4000, messages: toOpenAIMessages(systemPrompt, messages) };
   if (structured) {
     body.response_format = {
       type: 'json_schema',
@@ -548,13 +595,14 @@ async function callOpenRouter(systemPrompt: string, messages: any[], model: stri
 // ─────────────────────────────────────────────────────────────────
 // 11. JSON extraction fallback
 // ─────────────────────────────────────────────────────────────────
-function extractJson(text: string): any {
+function extractJson(text: string): DiplomaDSL {
   let cleaned = text.replace(/```(?:json)?\s*/gi,'').replace(/```\s*/g,'').trim();
   const s = cleaned.indexOf('{'); const e = cleaned.lastIndexOf('}');
   if (s === -1 || e === -1) throw new Error('No JSON found');
   cleaned = cleaned.substring(s, e+1);
   try { return JSON.parse(cleaned); }
   catch {
+    // eslint-disable-next-line no-control-regex -- intentionally strip control chars from malformed model JSON
     cleaned = cleaned.replace(/,\s*}/g,'}').replace(/,\s*]/g,']').replace(/[\x00-\x1F\x7F]/g,'');
     return JSON.parse(cleaned);
   }
@@ -563,8 +611,24 @@ function extractJson(text: string): any {
 // ─────────────────────────────────────────────────────────────────
 // 12. Web scrape helpers
 // ─────────────────────────────────────────────────────────────────
+// Basic SSRF guard: only fetch public http(s) hosts, never IP literals or local names
+const isSafePublicUrl = (raw: string): boolean => {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')) return false;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return false; // IPv4 literal
+    if (host.includes(':') || host.startsWith('[')) return false; // IPv6 literal
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const scrapeWebsiteData = async (url: string) => {
   try {
+    if (!isSafePublicUrl(url)) throw new Error('URL is not a public http(s) address');
     const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)' } });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const html = await r.text();
@@ -591,18 +655,45 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, requestType, imageData, url, currentHtml, currentCss, userFullName, isGuest } = await req.json();
+    const { messages, requestType, imageData, url, currentHtml, currentCss, userFullName } = await req.json();
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    if (!isGuest) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader?.startsWith('Bearer ')) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Derive identity from the token — never trust an isGuest flag from the body.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    let isAuthenticated = false;
+    if (authHeader.startsWith('Bearer ')) {
+      const supabaseAuth = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
+      const { data: { user } } = await supabaseAuth.auth.getUser(authHeader.replace('Bearer ', ''));
+      isAuthenticated = !!user;
+    }
+
+    // Guests are allowed a limited number of generations per IP per day,
+    // enforced server-side (the localStorage counter in the client is only UX).
+    if (!isAuthenticated) {
+      const GUEST_DAILY_LIMIT = 10;
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      const ipHash = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip))),
+      ).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      const { data: usage } = await supabaseAdmin.from('guest_usage').select('*').eq('ip_hash', ipHash).maybeSingle();
+      const windowExpired = !usage || Date.now() - new Date(usage.window_start).getTime() > dayMs;
+      const count = windowExpired ? 0 : usage.count;
+
+      if (count >= GUEST_DAILY_LIMIT) {
+        return new Response(JSON.stringify({ error: 'Guest limit reached', message: 'You have used all free generations for today. Create an account for unlimited access!' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
-      const { error } = await supabase.auth.getClaims(authHeader.replace('Bearer ',''));
-      if (error) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const { error: usageError } = await supabaseAdmin.from('guest_usage').upsert({
+        ip_hash: ipHash,
+        count: count + 1,
+        window_start: windowExpired ? new Date().toISOString() : usage.window_start,
+      });
+      // If the table doesn't exist yet (migration not applied), log but don't block guests.
+      if (usageError) console.error('guest_usage upsert failed:', usageError.message);
     }
 
     // Provider selection
@@ -615,12 +706,12 @@ serve(async (req) => {
     const variant = Math.floor(Math.random() * 5) + 1; // 1..5 seed
 
     let systemPrompt: string;
-    let aiMessages: any[];
+    let aiMessages: AIMessage[];
     let structured = true;
 
     if (isIteration) {
       systemPrompt = `${ITERATION_SYSTEM_PROMPT}\n\nCURRENT HTML:\n${currentHtml}\nCURRENT CSS:\n${currentCss}`;
-      aiMessages = (messages || []).filter((m: any) => m.role !== 'system');
+      aiMessages = ((messages || []) as AIMessage[]).filter((m) => m.role !== 'system');
       structured = false;
     } else if (requestType === 'image') {
       systemPrompt = dslSystemPrompt(variant) + '\n\nAnalyze the image and choose blocks reflecting its style.';
@@ -637,7 +728,7 @@ serve(async (req) => {
       aiMessages = [{ role: 'user', content: `Create a diploma for the brand at ${url}.` }];
     } else {
       systemPrompt = dslSystemPrompt(variant);
-      aiMessages = (messages || []).filter((m: any) => m.role !== 'system');
+      aiMessages = ((messages || []) as AIMessage[]).filter((m) => m.role !== 'system');
     }
 
     // Call provider
@@ -671,7 +762,7 @@ serve(async (req) => {
         chain.push({ p, m: defaultModelFor[p] });
       }
     }
-    let lastErr: any;
+    let lastErr: unknown;
     let usedProvider = provider;
     let usedModel = model;
     for (const step of chain) {
@@ -681,9 +772,9 @@ serve(async (req) => {
         usedModel = step.m;
         if (step.p !== provider) console.warn(`Fell back from ${provider} to ${step.p}`);
         break;
-      } catch (e: any) {
+      } catch (e) {
         lastErr = e;
-        console.error(`Provider ${step.p} failed:`, e.message);
+        console.error(`Provider ${step.p} failed:`, e instanceof Error ? e.message : e);
       }
     }
     if (!result!) throw lastErr || new Error('All providers failed');
@@ -698,9 +789,15 @@ serve(async (req) => {
       });
     }
 
-    const dsl = result.json || extractJson(result.text);
+    const dsl: DiplomaDSL = result.json || extractJson(result.text);
     console.log('DSL palette:', dsl.palette, 'comp:', dsl.layout?.composition, 'decos:', dsl.decorations);
     const rendered = renderDSL(dsl);
+
+    // Substitute the recipient placeholder the DSL prompt asks the model to emit
+    const recipient = typeof userFullName === 'string' && userFullName.trim() ? userFullName.trim() : '';
+    if (recipient) {
+      rendered.html = rendered.html.replaceAll('{{recipient_name}}', esc(recipient));
+    }
 
     return new Response(JSON.stringify({
       message: `Designed using ${dsl.palette} palette · ${dsl.typography?.pair} typography · ${dsl.layout?.composition} layout (variant ${variant}).`,
@@ -711,9 +808,10 @@ serve(async (req) => {
       dsl,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('generate-diploma error:', err);
-    return new Response(JSON.stringify({ error: err.message, message: 'Sorry, an error occurred while generating your diploma. Please try again.' }), {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage, message: 'Sorry, an error occurred while generating your diploma. Please try again.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -125,12 +125,16 @@ const AdminIntegrations = () => {
   }, []);
 
   const loadSettings = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('app_settings')
       .select('value')
       .eq('key', 'ai_provider')
-      .single();
+      .maybeSingle();
 
+    if (error) {
+      console.error('Failed to load AI provider setting:', error);
+      toast.error('Could not load the current AI provider setting');
+    }
     if (data?.value) {
       const val = data.value as { provider: string; model: string };
       setActiveProvider(val.provider);
@@ -144,7 +148,7 @@ const AdminIntegrations = () => {
     const { error } = await supabase
       .from('app_settings')
       .update({
-        value: { provider: activeProvider, model: activeModel } as any,
+        value: { provider: activeProvider, model: activeModel },
         updated_at: new Date().toISOString(),
       })
       .eq('key', 'ai_provider');
@@ -169,10 +173,15 @@ const AdminIntegrations = () => {
         toast.error(`${integration.name}: Test failed`);
       } else {
         setResults(prev => ({ ...prev, [integration.id]: data }));
-        data.success ? toast.success(`${integration.name}: OK (${data.latencyMs}ms)`) : toast.error(`${integration.name}: ${data.message}`);
+        if (data.success) {
+          toast.success(`${integration.name}: OK (${data.latencyMs}ms)`);
+        } else {
+          toast.error(`${integration.name}: ${data.message}`);
+        }
       }
-    } catch (err: any) {
-      setResults(prev => ({ ...prev, [integration.id]: { success: false, message: err.message, model, latencyMs: 0 } }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setResults(prev => ({ ...prev, [integration.id]: { success: false, message, model, latencyMs: 0 } }));
     } finally {
       setTesting(null);
     }

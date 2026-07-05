@@ -2,58 +2,45 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ExternalLink, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 
 const DiplomaEmbed = () => {
   const { diplomaId } = useParams();
-  const [diplomaData, setDiplomaData] = useState<any>(null);
+  const [diplomaData, setDiplomaData] = useState<Tables<'signed_diplomas'> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (diplomaId) {
-      fetchDiplomaData();
-    }
-  }, [diplomaId]);
+    if (!diplomaId) return;
+    const fetchDiplomaData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('signed_diplomas')
+          .select('*')
+          .eq('blockchain_id', diplomaId)
+          .maybeSingle();
 
-  const fetchDiplomaData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('signed_diplomas')
-        .select('*')
-        .eq('blockchain_id', diplomaId)
-        .maybeSingle();
+        if (error || !data) {
+          console.error('Error fetching diploma:', error);
+          return;
+        }
 
-      if (error || !data) {
-        console.error('Error fetching diploma:', error);
+        setDiplomaData(data);
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      setDiplomaData(data);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const cleanDiplomaHTML = (html: string) => {
-    // Remove QR code related elements and containers
-    return html
-      .replace(/<div[^>]*qr[^>]*>.*?<\/div>/gis, '') // Remove divs containing 'qr'
-      .replace(/<canvas[^>]*qr[^>]*>.*?<\/canvas>/gis, '') // Remove QR canvas elements
-      .replace(/<svg[^>]*qr[^>]*>.*?<\/svg>/gis, '') // Remove QR SVG elements
-      .replace(/<img[^>]*qr[^>]*[^>]*>/gis, '') // Remove QR images
-      .replace(/QR/g, '') // Remove any standalone "QR" text
-      .replace(/qr-code[^"'\s>]*/g, '') // Remove qr-code class references
-      .replace(/class="[^"]*qr[^"]*"/gis, '') // Remove classes containing 'qr'
-      .replace(/id="[^"]*qr[^"]*"/gis, ''); // Remove IDs containing 'qr'
-  };
+    };
+    fetchDiplomaData();
+  }, [diplomaId]);
 
   const getEmbedContent = () => {
     if (!diplomaData) return '';
-    
-    const cleanedHTML = cleanDiplomaHTML(diplomaData.diploma_html);
-    
+
+    // QR elements are hidden via the [class*="qr"] CSS rule below instead of
+    // regex-rewriting the HTML, which corrupted legitimate content containing "qr".
+    const cleanedHTML = diplomaData.diploma_html;
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -214,6 +201,7 @@ const DiplomaEmbed = () => {
 
   return (
     <iframe
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
       srcDoc={getEmbedContent()}
       style={{
         width: '100%',

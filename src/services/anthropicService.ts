@@ -57,8 +57,6 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
       }
     }
 
-    console.log('Using userFullName for signature:', userFullName);
-
     const response = await supabase.functions.invoke('generate-diploma', {
       body: {
         ...request,
@@ -78,15 +76,22 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
   }
 };
 
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
 export const generateDiplomaFromImage = async (imageFile: File): Promise<DiplomaGenerationResponse> => {
   try {
-    // Convert image to base64
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
     const imageData = {
       type: imageFile.type,
-      data: base64Data
+      data: await fileToBase64(imageFile),
     };
 
     return await generateDiploma({

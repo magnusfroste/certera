@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
+import { useDiploma } from '@/contexts/DiplomaContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Layout } from 'lucide-react';
@@ -19,14 +20,8 @@ import { Settings as SettingsIcon } from 'lucide-react';
 // Settings content component for embedding in other dialogs
 export const SettingsContent = () => {
   const { toast } = useToast();
-  const [diplomaFormat, setDiplomaFormat] = useState<'portrait' | 'landscape'>('portrait');
-
-  useEffect(() => {
-    const savedFormat = localStorage.getItem('diplomaFormat') as 'portrait' | 'landscape';
-    if (savedFormat) {
-      setDiplomaFormat(savedFormat);
-    }
-  }, []);
+  // Use the shared context so the setting actually affects generation
+  const { diplomaFormat, setDiplomaFormat } = useDiploma();
 
   const handleFormatChange = (format: 'portrait' | 'landscape') => {
     setDiplomaFormat(format);

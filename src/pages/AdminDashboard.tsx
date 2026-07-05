@@ -72,6 +72,11 @@ const AdminDashboard = () => {
     const hasAdmin = currentRoles.includes('admin');
 
     if (hasAdmin) {
+      // Guard against accidental self-lockout
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id === userId && !window.confirm('You are about to remove your own admin role and will lose access to this dashboard. Continue?')) {
+        return;
+      }
       const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin');
       if (error) {
         toast.error('Failed to remove admin role');
