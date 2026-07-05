@@ -20,6 +20,14 @@ function createMessage(content: string, isUser: boolean): Message {
   };
 }
 
+/** Prefer the server's message (e.g. guest limit reached) over a generic fallback. */
+function errorText(error: unknown, fallback: string): string {
+  const msg = error instanceof Error ? error.message : '';
+  // Ignore supabase-js's opaque wrapper text; use our fallback instead.
+  if (msg && !/non-2xx status code/i.test(msg)) return msg;
+  return fallback;
+}
+
 export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
   const {
     messages,
@@ -29,25 +37,26 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
     diplomaHtml,
     diplomaCss,
     diplomaDsl,
-    setDiplomaHtml,
-    setDiplomaCss,
-    setDiplomaDsl,
+    commitDesign,
     diplomaFormat,
   } = useDiploma();
 
   const applyResponse = useCallback(
     (response: { message: string; html: string; css: string; dsl?: unknown }) => {
       setMessages((prev: Message[]) => [...prev, createMessage(response.message, false)]);
-      if (response.html) setDiplomaHtml(response.html);
-      if (response.css) setDiplomaCss(response.css);
-      // Track the structured design; clears when the server used the legacy
-      // raw-HTML path so we never iterate on a stale DSL.
+      // Apply the new design and push the previous one onto the undo stack.
+      // dsl is null when the server used the legacy raw-HTML path, so we never
+      // iterate on a stale DSL.
       if (response.html || response.css) {
-        setDiplomaDsl((response.dsl as Parameters<typeof setDiplomaDsl>[0]) ?? null);
+        commitDesign({
+          html: response.html,
+          css: response.css,
+          dsl: (response.dsl as Parameters<typeof commitDesign>[0]['dsl']) ?? null,
+        });
       }
       if (isGuest && guestAccess) guestAccess.incrementUsage();
     },
-    [isGuest, guestAccess, setMessages, setDiplomaHtml, setDiplomaCss, setDiplomaDsl],
+    [isGuest, guestAccess, setMessages, commitDesign],
   );
 
   const addError = useCallback(
@@ -87,8 +96,8 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
           diplomaFormat,
         });
         applyResponse(response);
-      } catch {
-        addError('Sorry, I encountered an error. Please try again.');
+      } catch (error) {
+        addError(errorText(error, 'Sorry, I encountered an error. Please try again.'));
       } finally {
         setIsGenerating(false);
       }
@@ -109,8 +118,8 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
       try {
         const response = await generateDiplomaFromImage(file);
         applyResponse(response);
-      } catch {
-        addError('Sorry, I encountered an error analyzing the image. Please try again.');
+      } catch (error) {
+        addError(errorText(error, 'Sorry, I encountered an error analyzing the image. Please try again.'));
       } finally {
         setIsGenerating(false);
       }
@@ -137,8 +146,8 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
       try {
         const response = await generateDiplomaFromUrl(url);
         applyResponse(response);
-      } catch {
-        addError('Sorry, I encountered an error analyzing the website. Please try again.');
+      } catch (error) {
+        addError(errorText(error, 'Sorry, I encountered an error analyzing the website. Please try again.'));
       } finally {
         setIsGenerating(false);
       }

@@ -71,7 +71,11 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
     });
 
     if (response.error) {
-      throw new Error(response.error.message);
+      // The edge function returns a friendly `message` in its body (e.g. the
+      // guest daily limit). supabase-js hides it behind a generic error, so
+      // read the response body to surface the real message to the user.
+      const friendly = await extractFunctionErrorMessage(response.error);
+      throw new Error(friendly || response.error.message);
     }
 
     return response.data;
@@ -80,6 +84,20 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
     throw error;
   }
 };
+
+/** Pull the server-provided `message` out of a supabase FunctionsHttpError body. */
+async function extractFunctionErrorMessage(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown })?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (typeof body?.message === 'string') return body.message;
+    } catch {
+      // body wasn't JSON — fall through
+    }
+  }
+  return null;
+}
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {

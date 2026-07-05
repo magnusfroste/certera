@@ -65,8 +65,9 @@ const Verify = () => {
       if (error) { issues.push(`Database error: ${error.message}`); setVerificationResult({ isValid: false, issues }); return; }
       if (!diplomaData) { issues.push('Diploma not found on blockchain'); setVerificationResult({ isValid: false, issues }); return; }
 
-      // Verify recipient
-      if (diplomaData.recipient_name.toLowerCase() !== recipientName.trim().toLowerCase()) {
+      // Verify recipient — tolerant of case, leading/trailing and repeated spaces
+      const normalizeName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (normalizeName(diplomaData.recipient_name) !== normalizeName(recipientName)) {
         issues.push('Recipient name does not match');
       }
 
