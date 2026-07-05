@@ -77,6 +77,24 @@ export type Database = {
         }
         Relationships: []
       }
+      guest_usage: {
+        Row: {
+          count: number
+          ip_hash: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          ip_hash: string
+          window_start?: string
+        }
+        Update: {
+          count?: number
+          ip_hash?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
