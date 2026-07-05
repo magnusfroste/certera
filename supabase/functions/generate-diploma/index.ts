@@ -356,6 +356,89 @@ function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// 7b. DSL VALIDATION (design guardrails)
+// ─────────────────────────────────────────────────────────────────
+// Representative solid color per background style, for contrast checks
+const BG_REPRESENTATIVE: Record<string, string> = {
+  'parchment': '#eee2cd', 'clean-white': '#ffffff', 'ivory': '#fdfaf3',
+  'gradient-warm': '#f8f1e8', 'gradient-cool': '#edf1f6', 'linen': '#faf0e6',
+  'marble': '#f0f0f0', 'ocean-deep': '#c4dde9', 'cosmic-dark': '#16213e',
+  'botanical-green': '#e8f2e2', 'vintage-sepia': '#eeddc3', 'watercolor-soft': '#f0e8f0',
+  'royal-burgundy': '#f2d8d8',
+};
+const DARK_BGS = new Set(['cosmic-dark']);
+
+function relativeLuminance(hex: string): number | null {
+  const m = hex.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a: string, b: string): number | null {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  if (la === null || lb === null) return null;
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// Fixes that don't need the model: drop overrides that would produce
+// unreadable or mismatched designs, keep the curated palette instead.
+function applyDeterministicFixes(dsl: DiplomaDSL): void {
+  const palette = PALETTES[dsl.palette ?? ''] || PALETTES['ivory-navy'];
+  const isLightText = palette.text === 'light';
+
+  // A background override whose darkness doesn't match the palette's text
+  // color would make body text unreadable — drop the override.
+  if (dsl.background?.style && DARK_BGS.has(dsl.background.style) !== isLightText) {
+    console.warn(`Dropping background override '${dsl.background.style}' (mismatches '${dsl.palette}' text color)`);
+    delete dsl.background;
+  }
+
+  const bgKey = dsl.background?.style || palette.bg;
+  const bgColor = BG_REPRESENTATIVE[bgKey] || '#ffffff';
+
+  // Brand primary is used for headings/recipient: needs real contrast (WCAG
+  // large-text threshold). Brand accent is decorative: a lower bar.
+  if (dsl.brand?.primaryColor) {
+    const ratio = contrastRatio(dsl.brand.primaryColor, bgColor);
+    if (ratio !== null && ratio < 3) {
+      console.warn(`Dropping brand.primaryColor ${dsl.brand.primaryColor} (contrast ${ratio.toFixed(2)}:1 on ${bgKey})`);
+      delete dsl.brand.primaryColor;
+    }
+  }
+  if (dsl.brand?.accentColor) {
+    const ratio = contrastRatio(dsl.brand.accentColor, bgColor);
+    if (ratio !== null && ratio < 1.6) {
+      console.warn(`Dropping brand.accentColor ${dsl.brand.accentColor} (contrast ${ratio.toFixed(2)}:1 on ${bgKey})`);
+      delete dsl.brand.accentColor;
+    }
+  }
+}
+
+// Issues the model should fix itself (content doesn't fit the layout).
+// Returned strings are fed back to the model in one repair round.
+function validateDsl(dsl: DiplomaDSL): string[] {
+  const issues: string[] = [];
+  const descLimit = dsl.layout?.composition === 'split-horizontal' ? 280 : 420;
+  const desc = dsl.body?.description ?? '';
+  if (desc.length > descLimit) {
+    issues.push(`body.description is ${desc.length} characters but must be at most ${descLimit} for the '${dsl.layout?.composition || 'classic-stack'}' composition — shorten it or pick another composition`);
+  }
+  if ((dsl.body?.title ?? '').length > 60) issues.push('body.title must be at most 60 characters');
+  if ((dsl.header?.institutionName ?? '').length > 60) issues.push('header.institutionName must be at most 60 characters');
+  if ((dsl.header?.subtitle ?? '').length > 90) issues.push('header.subtitle must be at most 90 characters');
+  if ((dsl.seal?.text ?? '').length > 20) issues.push('seal.text must be at most 20 characters');
+  return issues;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 8. JSON SCHEMA (used by all providers for structured output)
 // ─────────────────────────────────────────────────────────────────
 const PALETTE_IDS = Object.keys(PALETTES);
@@ -464,6 +547,26 @@ MESSAGE: [brief explanation]
 HTML: [complete HTML]
 CSS: [complete CSS]
 Make ONLY the specific changes requested.`;
+
+// DSL-native iteration: the model modifies the structured design instead of
+// free-form HTML/CSS, so every change stays inside the design system.
+function dslIterationSystemPrompt(currentDsl: DiplomaDSL): string {
+  return `You are an expert diploma designer. You MODIFY an existing diploma design expressed as a DSL.
+
+CURRENT DESIGN:
+${JSON.stringify(currentDsl, null, 2)}
+
+RULES:
+- Apply ONLY the changes the user asks for. Keep every other field exactly as it is in the current design.
+- Text changes (title, description, names, dates) go in the corresponding DSL fields.
+- Style changes are made by picking different predefined blocks — never invent values outside the schema.
+- Keep body.recipientName unchanged unless the user explicitly asks to change the recipient.
+- Do NOT include customCss unless absolutely required.
+- Available palettes: ${PALETTE_IDS.join(', ')}.
+- Available typography pairs: ${TYPOGRAPHY_IDS.join(', ')}.
+
+Return the COMPLETE updated design (all fields, not just the changed ones).`;
+}
 
 // ─────────────────────────────────────────────────────────────────
 // 10. PROVIDER ADAPTERS (structured output, provider-agnostic)
@@ -702,7 +805,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, requestType, imageData, url, currentHtml, currentCss, userFullName } = await req.json();
+    const { messages, requestType, imageData, url, currentHtml, currentCss, currentDsl, userFullName } = await req.json();
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -750,13 +853,20 @@ serve(async (req) => {
     console.log(`Provider: ${provider}, model: ${model}`);
 
     const isIteration = !!(currentHtml && currentCss) && requestType !== 'image' && requestType !== 'url';
+    // DSL-native iteration when the client still has the structured design;
+    // legacy raw HTML/CSS iteration only for sessions without a DSL
+    // (older sessions, or manually edited HTML/CSS).
+    const dslIteration = isIteration && currentDsl && typeof currentDsl === 'object';
     const variant = Math.floor(Math.random() * 5) + 1; // 1..5 seed
 
     let systemPrompt: string;
     let aiMessages: AIMessage[];
     let structured = true;
 
-    if (isIteration) {
+    if (dslIteration) {
+      systemPrompt = dslIterationSystemPrompt(currentDsl as DiplomaDSL);
+      aiMessages = ((messages || []) as AIMessage[]).filter((m) => m.role !== 'system');
+    } else if (isIteration) {
       systemPrompt = `${ITERATION_SYSTEM_PROMPT}\n\nCURRENT HTML:\n${currentHtml}\nCURRENT CSS:\n${currentCss}`;
       aiMessages = ((messages || []) as AIMessage[]).filter((m) => m.role !== 'system');
       structured = false;
@@ -780,13 +890,13 @@ serve(async (req) => {
 
     // Call provider
     let result: AIResponse;
-    const callProvider = async (p: string, m: string): Promise<AIResponse> => {
+    const callProvider = async (p: string, m: string, msgs: AIMessage[] = aiMessages): Promise<AIResponse> => {
       switch (p) {
-        case 'openai':     return callOpenAI(systemPrompt, aiMessages, m, structured);
-        case 'gemini':     return callGemini(systemPrompt, aiMessages, m, structured);
-        case 'openrouter': return callOpenRouter(systemPrompt, aiMessages, m, structured);
+        case 'openai':     return callOpenAI(systemPrompt, msgs, m, structured);
+        case 'gemini':     return callGemini(systemPrompt, msgs, m, structured);
+        case 'openrouter': return callOpenRouter(systemPrompt, msgs, m, structured);
         case 'anthropic':
-        default:           return callAnthropic(systemPrompt, aiMessages, m, structured);
+        default:           return callAnthropic(systemPrompt, msgs, m, structured);
       }
     };
     // Default model per provider (used in fallback)
@@ -826,7 +936,7 @@ serve(async (req) => {
     }
     if (!result!) throw lastErr || new Error('All providers failed');
 
-    if (isIteration) {
+    if (isIteration && !dslIteration) {
       const strip = (s: string) => s.replace(/```(?:html|css|)\s*/gi,'').replace(/```\s*/g,'').trim();
       const msg = result.text.match(/MESSAGE:\s*(.*?)(?=HTML:|$)/s)?.[1]?.trim() || "I've updated the diploma!";
       const htmlPart = strip(result.text.match(/HTML:\s*(.*?)(?=CSS:|$)/s)?.[1]?.trim() || '');
@@ -836,7 +946,32 @@ serve(async (req) => {
       });
     }
 
-    const dsl: DiplomaDSL = result.json || extractJson(result.text);
+    let dsl: DiplomaDSL = result.json || extractJson(result.text);
+
+    // Guardrails: content that doesn't fit the layout gets one repair round
+    // with the model; readability problems are fixed deterministically.
+    const issues = validateDsl(dsl);
+    if (issues.length > 0) {
+      console.warn('DSL validation issues, requesting repair:', issues);
+      try {
+        const repairMessages: AIMessage[] = [
+          ...aiMessages,
+          { role: 'assistant', content: JSON.stringify(dsl) },
+          { role: 'user', content: `The design has problems that must be fixed:\n- ${issues.join('\n- ')}\nReturn the complete corrected design. Change as little as possible.` },
+        ];
+        const repaired = await callProvider(usedProvider, usedModel, repairMessages);
+        const repairedDsl: DiplomaDSL = repaired.json || extractJson(repaired.text);
+        const remaining = validateDsl(repairedDsl);
+        if (remaining.length < issues.length) {
+          dsl = repairedDsl;
+        }
+        if (remaining.length > 0) console.warn('DSL issues remaining after repair:', remaining);
+      } catch (e) {
+        console.error('DSL repair round failed, rendering original:', e instanceof Error ? e.message : e);
+      }
+    }
+    applyDeterministicFixes(dsl);
+
     console.log('DSL palette:', dsl.palette, 'comp:', dsl.layout?.composition, 'decos:', dsl.decorations);
     const rendered = renderDSL(dsl);
 
@@ -846,8 +981,12 @@ serve(async (req) => {
       rendered.html = rendered.html.replaceAll('{{recipient_name}}', esc(recipient));
     }
 
+    const message = dslIteration
+      ? "I've updated the diploma!"
+      : `Designed using ${dsl.palette} palette · ${dsl.typography?.pair} typography · ${dsl.layout?.composition} layout (variant ${variant}).`;
+
     return new Response(JSON.stringify({
-      message: `Designed using ${dsl.palette} palette · ${dsl.typography?.pair} typography · ${dsl.layout?.composition} layout (variant ${variant}).`,
+      message,
       html: rendered.html,
       css: rendered.css,
       provider: usedProvider,

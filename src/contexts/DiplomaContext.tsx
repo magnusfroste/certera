@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
 interface DiplomaFields {
@@ -16,6 +17,9 @@ interface DiplomaContextType {
   setDiplomaHtml: (html: string) => void;
   diplomaCss: string;
   setDiplomaCss: (css: string) => void;
+  /** Structured design (DSL) matching the current HTML/CSS, or null after manual edits */
+  diplomaDsl: Json | null;
+  setDiplomaDsl: (dsl: Json | null) => void;
   isGenerating: boolean;
   setIsGenerating: (generating: boolean) => void;
   messages: Message[];
@@ -49,6 +53,7 @@ const EMPTY_FIELDS: DiplomaFields = { recipientName: '', degree: '', field: '', 
 export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   const [diplomaHtml, setDiplomaHtml] = useState('');
   const [diplomaCss, setDiplomaCss] = useState('');
+  const [diplomaDsl, setDiplomaDsl] = useState<Json | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [signingRecipientName, setSigningRecipientName] = useState('');
   const [signingInstitutionName, setSigningInstitutionName] = useState('');
@@ -63,6 +68,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   // ── Refs: always-fresh values for async operations ──
   const htmlRef = useRef(diplomaHtml);
   const cssRef = useRef(diplomaCss);
+  const dslRef = useRef(diplomaDsl);
   const formatRef = useRef(diplomaFormat);
   const messagesRef = useRef(messages);
   const sessionIdRef = useRef(currentSessionId);
@@ -72,6 +78,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   // Keep refs in sync with state
   useEffect(() => { htmlRef.current = diplomaHtml; }, [diplomaHtml]);
   useEffect(() => { cssRef.current = diplomaCss; }, [diplomaCss]);
+  useEffect(() => { dslRef.current = diplomaDsl; }, [diplomaDsl]);
   useEffect(() => { formatRef.current = diplomaFormat; }, [diplomaFormat]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
@@ -85,6 +92,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
 
     const html = htmlRef.current;
     const css = cssRef.current;
+    const dsl = dslRef.current;
     const format = formatRef.current;
     const msgs = JSON.parse(JSON.stringify(messagesRef.current));
     const sessionId = sessionIdRef.current;
@@ -95,6 +103,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
         .update({
           diploma_html: html,
           diploma_css: css,
+          diploma_dsl: dsl,
           diploma_format: format,
           messages: msgs,
           title: title || 'Untitled Diploma',
@@ -110,6 +119,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
         .insert({
           diploma_html: html,
           diploma_css: css,
+          diploma_dsl: dsl,
           diploma_format: format,
           messages: msgs,
           title: title || 'Untitled Diploma',
@@ -152,6 +162,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     setCurrentSessionId(null);
     setDiplomaHtml('');
     setDiplomaCss('');
+    setDiplomaDsl(null);
     const saved = localStorage.getItem('diplomaFormat');
     setDiplomaFormat(saved === 'landscape' || saved === 'portrait' ? saved : 'portrait');
     setDiplomaFields(EMPTY_FIELDS);
@@ -180,6 +191,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     setCurrentSessionId(data.id);
     setDiplomaHtml(data.diploma_html);
     setDiplomaCss(data.diploma_css);
+    setDiplomaDsl(data.diploma_dsl ?? null);
     setDiplomaFormat((data.diploma_format as 'portrait' | 'landscape') || 'portrait');
 
     const savedMessages = data.messages as unknown;
@@ -199,6 +211,8 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
       setDiplomaHtml,
       diplomaCss,
       setDiplomaCss,
+      diplomaDsl,
+      setDiplomaDsl,
       isGenerating,
       setIsGenerating,
       messages,

@@ -18,7 +18,7 @@ const TabLoader = () => (
 );
 
 export const PreviewPanel = () => {
-  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss } = useDiploma();
+  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const [editableHtml, setEditableHtml] = useState(diplomaHtml || '');
@@ -33,11 +33,14 @@ export const PreviewPanel = () => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       if (event.data?.type === 'DIPLOMA_HTML_UPDATE' && typeof event.data.html === 'string') {
         setDiplomaHtml(event.data.html);
+        // Manual inline edits diverge from the structured design — clear it
+        // so the next AI iteration works from the edited HTML instead.
+        setDiplomaDsl(null);
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [setDiplomaHtml]);
+  }, [setDiplomaHtml, setDiplomaDsl]);
 
   useEffect(() => {
     setEditableHtml(diplomaHtml || '');
@@ -54,6 +57,8 @@ export const PreviewPanel = () => {
   const handleSave = () => {
     setDiplomaHtml(editableHtml);
     setDiplomaCss(editableCss);
+    // Hand-edited code no longer matches the structured design
+    setDiplomaDsl(null);
     setHasUnsavedChanges(false);
   };
 

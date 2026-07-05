@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -15,6 +16,8 @@ export interface DiplomaGenerationRequest {
   url?: string;
   currentHtml?: string;
   currentCss?: string;
+  /** Structured design of the current diploma — enables DSL-native iteration */
+  currentDsl?: Json;
   userFullName?: string;
   diplomaFormat?: 'portrait' | 'landscape';
 }
@@ -23,6 +26,8 @@ export interface DiplomaGenerationResponse {
   message: string;
   html: string;
   css: string;
+  /** Structured design when the server generated via the DSL (absent on legacy raw iteration) */
+  dsl?: Json;
 }
 
 export const generateDiploma = async (request: DiplomaGenerationRequest): Promise<DiplomaGenerationResponse> => {
