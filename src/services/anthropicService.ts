@@ -54,11 +54,12 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
             userFullName = user.user_metadata.full_name;
           } else {
             // Use email prefix as final fallback
-            userFullName = user.email?.split('@')[0] || 'User';
+            userFullName = user.email?.split('@')[0] || 'Your Name';
           }
         }
       } else {
-        userFullName = 'User';
+        // Guest / demo: a friendly placeholder reads better than "User"
+        userFullName = 'Your Name';
       }
     }
 

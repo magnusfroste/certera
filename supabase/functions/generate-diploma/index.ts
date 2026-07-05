@@ -117,7 +117,8 @@ function compositionCss(comp: Composition, primary: string, accent: string): str
     case 'split-horizontal':
       return `.comp-split{display:grid;grid-template-columns:1fr 2fr;gap:2em;align-items:center}.comp-split .diploma-header{text-align:left;border-right:2px solid ${accent}40;padding-right:1.5em;margin-bottom:0}.comp-split .diploma-header .institution{text-align:left}.comp-split-content{display:flex;flex-direction:column;gap:.5em}`;
     case 'corner-accent':
-      return `.comp-corner{position:relative}.comp-corner::before{content:'';position:absolute;top:0;left:0;width:80px;height:80px;border-top:6px solid ${accent};border-left:6px solid ${accent}}.comp-corner::after{content:'';position:absolute;bottom:0;right:0;width:80px;height:80px;border-bottom:6px solid ${accent};border-right:6px solid ${accent}}`;
+      // Inset from the edge so the container's overflow:hidden never clips it
+      return `.comp-corner{position:relative}.comp-corner::before{content:'';position:absolute;top:14px;left:14px;width:60px;height:60px;border-top:4px solid ${accent};border-left:4px solid ${accent}}.comp-corner::after{content:'';position:absolute;bottom:14px;right:14px;width:60px;height:60px;border-bottom:4px solid ${accent};border-right:4px solid ${accent}}`;
     case 'classic-stack':
     default:
       return '';
@@ -132,7 +133,7 @@ function decorationCss(decos: string[], primary: string, accent: string): string
   for (const d of decos.slice(0, 2)) {
     switch (d) {
       case 'corner-flourishes':
-        out.push(`.deco-flourish{position:relative}.deco-flourish .diploma-border::before{content:'❦';position:absolute;top:6px;left:10px;color:${accent};font-size:22px;z-index:2}.deco-flourish .diploma-border::after{content:'❦';position:absolute;bottom:6px;right:10px;color:${accent};font-size:22px;transform:rotate(180deg);z-index:2}`);
+        out.push(`.deco-flourish{position:relative}.deco-flourish .diploma-border::before{content:'❦';position:absolute;top:14px;left:18px;color:${accent};opacity:.75;font-size:20px;z-index:2}.deco-flourish .diploma-border::after{content:'❦';position:absolute;bottom:14px;right:18px;color:${accent};opacity:.75;font-size:20px;transform:rotate(180deg);z-index:2}`);
         break;
       case 'watermark-monogram':
         out.push(`.deco-watermark .diploma-body{position:relative}.deco-watermark .diploma-body::before{content:'★';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:280px;color:${primary};opacity:.04;pointer-events:none;z-index:0}.deco-watermark .diploma-body>*{position:relative;z-index:1}`);
@@ -144,7 +145,7 @@ function decorationCss(decos: string[], primary: string, accent: string): string
         out.push(`.deco-guilloche{background-image:repeating-radial-gradient(circle at 0 0,transparent 0,${primary}08 1px,transparent 2px,transparent 18px),repeating-radial-gradient(circle at 100% 100%,transparent 0,${accent}08 1px,transparent 2px,transparent 18px)}`);
         break;
       case 'laurel-side':
-        out.push(`.deco-laurel .diploma-body{position:relative;padding:0 60px}.deco-laurel .diploma-body::before,.deco-laurel .diploma-body::after{content:'❧';position:absolute;top:50%;transform:translateY(-50%);color:${accent};font-size:48px;opacity:.5}.deco-laurel .diploma-body::before{left:0;transform:translateY(-50%) scaleX(-1)}.deco-laurel .diploma-body::after{right:0}`);
+        out.push(`.deco-laurel .diploma-body{position:relative;padding:0 56px}.deco-laurel .diploma-body::before,.deco-laurel .diploma-body::after{content:'❧';position:absolute;top:50%;transform:translateY(-50%);color:${accent};font-size:32px;opacity:.3}.deco-laurel .diploma-body::before{left:8px;transform:translateY(-50%) scaleX(-1)}.deco-laurel .diploma-body::after{right:8px}`);
         break;
       case 'subtle-grid':
         out.push(`.deco-grid{background-image:linear-gradient(${primary}06 1px,transparent 1px),linear-gradient(90deg,${primary}06 1px,transparent 1px);background-size:24px 24px}`);
@@ -201,16 +202,19 @@ function getHeaderCss(style: string, color: string, headingFont: string): string
 
 function getSealHtmlCss(style: string, color: string, text?: string): {html:string;css:string} {
   if (!style || style === 'none') return {html:'',css:''};
-  const t = esc(text || 'VERIFIED');
+  // Seals are small — keep to a single short token so text never overflows the
+  // shape or collides with the wreath flanks (e.g. "GREENERY SEAL" → "GREENERY").
+  const firstWord = (text || 'VERIFIED').trim().split(/\s+/)[0].slice(0, 12);
+  const t = esc(firstWord || 'VERIFIED');
   const map: Record<string, {html:string;css:string}> = {
-    'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:2px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:1px;text-transform:uppercase;max-width:60px;text-align:center;line-height:1.15;word-break:break-word}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'star': {css:`.diploma-seal{width:80px;height:80px;background:${color};clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);display:flex;align-items:center;justify-content:center;color:white;font-size:20px}`,html:`<div class="diploma-seal">★</div>`},
     'shield': {css:`.diploma-seal{width:70px;height:85px;background:${color};clip-path:polygon(0% 0%,100% 0%,100% 70%,50% 100%,0% 70%);display:flex;align-items:center;justify-content:center;padding-bottom:10px}.diploma-seal .seal-text{color:white;font-size:8px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'ribbon': {css:`.diploma-seal{background:${color};color:white;padding:6px 24px;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;position:relative}.diploma-seal::before,.diploma-seal::after{content:'';position:absolute;bottom:-8px;border:8px solid ${color};border-bottom-color:transparent}.diploma-seal::before{left:0;border-left-color:transparent}.diploma-seal::after{right:0;border-right-color:transparent}`,html:`<div class="diploma-seal">CERTIFIED</div>`},
     'modern-circle': {css:`.diploma-seal{width:60px;height:60px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:${color}}`,html:`<div class="diploma-seal">✓</div>`},
     'rosette': {css:`.diploma-seal{width:80px;height:80px;background:radial-gradient(circle,${color} 30%,transparent 31%),conic-gradient(from 0deg,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60);border-radius:50%;display:flex;align-items:center;justify-content:center}.diploma-seal .seal-text{color:white;font-size:9px;font-weight:bold;letter-spacing:1px}`,html:`<div class="diploma-seal"><span class="seal-text">AWARD</span></div>`},
-    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal .seal-text{font-size:18px;font-weight:bold;color:${color}}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
-    'laurel-wreath': {css:`.diploma-seal{width:90px;height:90px;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'❧';position:absolute;left:2px;top:50%;transform:translateY(-50%) scaleX(-1);color:${color};font-size:32px}.diploma-seal::after{content:'❧';position:absolute;right:2px;top:50%;transform:translateY(-50%);color:${color};font-size:32px}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:2px;text-transform:uppercase;border-top:1px solid ${color}40;border-bottom:1px solid ${color}40;padding:4px 0}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal .seal-text{font-size:11px;font-weight:bold;color:${color};max-width:54px;text-align:center;line-height:1.15;letter-spacing:1px;text-transform:uppercase;word-break:break-word}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'laurel-wreath': {css:`.diploma-seal{width:96px;height:90px;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'❧';position:absolute;left:0;top:50%;transform:translateY(-50%) scaleX(-1);color:${color};opacity:.85;font-size:30px}.diploma-seal::after{content:'❧';position:absolute;right:0;top:50%;transform:translateY(-50%);color:${color};opacity:.85;font-size:30px}.diploma-seal .seal-text{max-width:46px;text-align:center;font-size:8px;font-weight:bold;color:${color};letter-spacing:1px;text-transform:uppercase;line-height:1.15;word-break:break-word;border-top:1px solid ${color}40;border-bottom:1px solid ${color}40;padding:3px 0}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
   };
   return map[style] || map['classical-round'];
 }
