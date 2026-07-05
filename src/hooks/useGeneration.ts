@@ -13,7 +13,7 @@ interface GuestAccess {
 
 function createMessage(content: string, isUser: boolean): Message {
   return {
-    id: (Date.now() + (isUser ? 0 : 1)).toString(),
+    id: crypto.randomUUID(),
     content,
     isUser,
     timestamp: new Date(),
@@ -28,19 +28,26 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
     setIsGenerating,
     diplomaHtml,
     diplomaCss,
+    diplomaDsl,
     setDiplomaHtml,
     setDiplomaCss,
+    setDiplomaDsl,
     diplomaFormat,
   } = useDiploma();
 
   const applyResponse = useCallback(
-    (response: { message: string; html: string; css: string }) => {
+    (response: { message: string; html: string; css: string; dsl?: unknown }) => {
       setMessages((prev: Message[]) => [...prev, createMessage(response.message, false)]);
       if (response.html) setDiplomaHtml(response.html);
       if (response.css) setDiplomaCss(response.css);
+      // Track the structured design; clears when the server used the legacy
+      // raw-HTML path so we never iterate on a stale DSL.
+      if (response.html || response.css) {
+        setDiplomaDsl((response.dsl as Parameters<typeof setDiplomaDsl>[0]) ?? null);
+      }
       if (isGuest && guestAccess) guestAccess.incrementUsage();
     },
-    [isGuest, guestAccess, setMessages, setDiplomaHtml, setDiplomaCss],
+    [isGuest, guestAccess, setMessages, setDiplomaHtml, setDiplomaCss, setDiplomaDsl],
   );
 
   const addError = useCallback(
@@ -65,7 +72,6 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
 
       try {
         const chatMessages: ChatMessage[] = messages
-          .filter((m) => m.id !== '1')
           .map((msg) => ({
             role: msg.isUser ? ('user' as const) : ('assistant' as const),
             content: msg.content,
@@ -77,6 +83,7 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
           requestType: 'text',
           currentHtml: diplomaHtml || undefined,
           currentCss: diplomaCss || undefined,
+          currentDsl: diplomaDsl ?? undefined,
           diplomaFormat,
         });
         applyResponse(response);
@@ -86,7 +93,7 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
         setIsGenerating(false);
       }
     },
-    [isGenerating, isGuest, guestAccess, messages, diplomaHtml, diplomaCss, diplomaFormat, setMessages, setIsGenerating, applyResponse, addError],
+    [isGenerating, isGuest, guestAccess, messages, diplomaHtml, diplomaCss, diplomaDsl, diplomaFormat, setMessages, setIsGenerating, applyResponse, addError],
   );
 
   /** Generate from an uploaded image file */

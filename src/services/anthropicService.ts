@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -15,6 +16,8 @@ export interface DiplomaGenerationRequest {
   url?: string;
   currentHtml?: string;
   currentCss?: string;
+  /** Structured design of the current diploma — enables DSL-native iteration */
+  currentDsl?: Json;
   userFullName?: string;
   diplomaFormat?: 'portrait' | 'landscape';
 }
@@ -23,6 +26,8 @@ export interface DiplomaGenerationResponse {
   message: string;
   html: string;
   css: string;
+  /** Structured design when the server generated via the DSL (absent on legacy raw iteration) */
+  dsl?: Json;
 }
 
 export const generateDiploma = async (request: DiplomaGenerationRequest): Promise<DiplomaGenerationResponse> => {
@@ -57,8 +62,6 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
       }
     }
 
-    console.log('Using userFullName for signature:', userFullName);
-
     const response = await supabase.functions.invoke('generate-diploma', {
       body: {
         ...request,
@@ -78,15 +81,22 @@ export const generateDiploma = async (request: DiplomaGenerationRequest): Promis
   }
 };
 
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
 export const generateDiplomaFromImage = async (imageFile: File): Promise<DiplomaGenerationResponse> => {
   try {
-    // Convert image to base64
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
     const imageData = {
       type: imageFile.type,
-      data: base64Data
+      data: await fileToBase64(imageFile),
     };
 
     return await generateDiploma({

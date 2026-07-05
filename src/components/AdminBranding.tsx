@@ -84,8 +84,8 @@ const FileUploadField = ({ label, value, storagePath, accept = 'image/*', previe
       const url = await uploadBrandingFile(file, storagePath);
       onChange(url);
       toast.success(`${label} uploaded!`);
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`);
+    } catch (err) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -143,25 +143,29 @@ const AdminBranding = () => {
   }, []);
 
   const loadSettings = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('app_settings')
       .select('key, value')
       .in('key', ['branding', 'og_social']);
 
+    if (error) {
+      console.error('Failed to load branding settings:', error);
+      toast.error('Could not load current branding settings');
+    }
     if (data) {
       for (const row of data) {
         if (row.key === 'branding') {
-          setBranding({ ...defaultBranding, ...(row.value as any) });
+          setBranding({ ...defaultBranding, ...(row.value as Partial<BrandingSettings>) });
         }
         if (row.key === 'og_social') {
-          setOg({ ...defaultOg, ...(row.value as any) });
+          setOg({ ...defaultOg, ...(row.value as Partial<OgSettings>) });
         }
       }
     }
     setLoading(false);
   };
 
-  const upsertSetting = async (key: string, value: any) => {
+  const upsertSetting = async (key: string, value: BrandingSettings | OgSettings) => {
     const { data: existing } = await supabase
       .from('app_settings')
       .select('id')

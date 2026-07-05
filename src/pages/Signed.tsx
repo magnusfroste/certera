@@ -52,6 +52,13 @@ const Signed = () => {
       setLoading(false);
       if (!session) navigate('/auth');
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) navigate('/auth');
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   if (loading || !user) return null;

@@ -1,16 +1,24 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Download, Code, Eye, Maximize, Save, X, Share, Shield, Pencil } from 'lucide-react';
+import React, { useRef, useState, useEffect, lazy, Suspense } from 'react';
+import { Download, Code, Eye, Maximize, Save, X, Share, Shield, Pencil, Loader2 } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { AnimationTemplates } from '@/components/AnimationTemplates';
 import { Button } from '@/components/ui/button';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonacoEditor } from '@/components/MonacoEditor';
-import { SharePanel } from '@/components/SharePanel';
-import { BlockchainSigner } from '@/components/BlockchainSigner';
+
+// Lazy-load heavy tab content (SharePanel pulls in jspdf + html2canvas)
+const SharePanel = lazy(() => import('@/components/SharePanel').then((m) => ({ default: m.SharePanel })));
+const BlockchainSigner = lazy(() => import('@/components/BlockchainSigner').then((m) => ({ default: m.BlockchainSigner })));
+
+const TabLoader = () => (
+  <div className="flex justify-center py-8">
+    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+  </div>
+);
 
 export const PreviewPanel = () => {
-  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss } = useDiploma();
+  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const [editableHtml, setEditableHtml] = useState(diplomaHtml || '');
@@ -21,13 +29,18 @@ export const PreviewPanel = () => {
   // Listen for postMessage from iframe for edit mode updates
   useEffect(() => {
     const handler = (event: MessageEvent) => {
+      // Only accept messages from our own preview iframe
+      if (event.source !== iframeRef.current?.contentWindow) return;
       if (event.data?.type === 'DIPLOMA_HTML_UPDATE' && typeof event.data.html === 'string') {
         setDiplomaHtml(event.data.html);
+        // Manual inline edits diverge from the structured design — clear it
+        // so the next AI iteration works from the edited HTML instead.
+        setDiplomaDsl(null);
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [setDiplomaHtml]);
+  }, [setDiplomaHtml, setDiplomaDsl]);
 
   useEffect(() => {
     setEditableHtml(diplomaHtml || '');
@@ -44,6 +57,8 @@ export const PreviewPanel = () => {
   const handleSave = () => {
     setDiplomaHtml(editableHtml);
     setDiplomaCss(editableCss);
+    // Hand-edited code no longer matches the structured design
+    setDiplomaDsl(null);
     setHasUnsavedChanges(false);
   };
 
@@ -243,10 +258,10 @@ export const PreviewPanel = () => {
             >
               <Pencil className="w-3.5 h-3.5" />
             </Toggle>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleFullscreen}>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleFullscreen} aria-label="Fullscreen preview">
               <Maximize className="w-3.5 h-3.5" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleDownload}>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleDownload} aria-label="Download as HTML">
               <Download className="w-3.5 h-3.5" />
             </Button>
           </div>
@@ -263,6 +278,7 @@ export const PreviewPanel = () => {
             <div className="h-full rounded-xl border border-border overflow-hidden shadow-lg shadow-black/20">
               <iframe
                 ref={iframeRef}
+                sandbox="allow-scripts"
                 srcDoc={getPreviewContent()}
                 className="w-full h-full border-0"
                 title="Diploma Preview"
@@ -342,13 +358,17 @@ export const PreviewPanel = () => {
 
           <TabsContent value="sign" className="flex-1 p-3 m-0">
             <div className="max-w-md mx-auto">
-              <BlockchainSigner />
+              <Suspense fallback={<TabLoader />}>
+                <BlockchainSigner />
+              </Suspense>
             </div>
           </TabsContent>
 
           <TabsContent value="share" className="flex-1 p-3 m-0">
             <div className="max-w-md mx-auto">
-              <SharePanel />
+              <Suspense fallback={<TabLoader />}>
+                <SharePanel />
+              </Suspense>
             </div>
           </TabsContent>
         </div>

@@ -14,6 +14,9 @@ export interface DiplomaRecord {
   hederaExplorerUrl?: string;
 }
 
+/** Fired on window after a diploma has been signed and stored */
+export const DIPLOMA_SIGNED_EVENT = 'certera:diploma-signed';
+
 /**
  * Creates a SHA-256 hash using Web Crypto API
  */
@@ -46,7 +49,7 @@ export const createDiplomatorSignature = async (contentHash: string, recipientNa
  * Generates a unique diploma ID
  */
 export const generateDiplomaId = (): string => {
-  return 'DIP_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+  return 'DIP_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 11);
 };
 
 const getCurrentBaseUrl = (): string => {
@@ -133,6 +136,8 @@ export const signDiplomaToBlockchain = async (
   if (insertError) throw new Error('Failed to store diploma: ' + insertError.message);
 
   sessionStorage.setItem('lastDiplomaUrl', diplomaUrl);
+  // Let listeners (e.g. SharePanel) know the current diploma is now signed
+  window.dispatchEvent(new CustomEvent(DIPLOMA_SIGNED_EVENT));
 
   return {
     id: diplomaId,
@@ -191,7 +196,7 @@ export const verifyDiplomaFromBlockchain = async (
   }
 
   // Parse Hedera data
-  let hederaData: any = {};
+  let hederaData: Partial<Pick<DiplomaRecord, 'hederaTxId' | 'hederaTopicId' | 'hederaSequenceNumber' | 'hederaExplorerUrl'>> = {};
   try {
     hederaData = JSON.parse(diplomaData.diplomator_seal);
   } catch { /* legacy record without hedera data */ }

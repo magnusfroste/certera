@@ -28,11 +28,11 @@ export const BlockchainMenu = () => {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-blue-600" />
+            <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span className="hidden sm:inline">Blockchain Verification</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 bg-white border shadow-lg">
+        <DropdownMenuContent align="end" className="w-64 border shadow-lg">
           <DropdownMenuLabel className="font-semibold">Blockchain Verification</DropdownMenuLabel>
           <DropdownMenuSeparator />
           
@@ -60,7 +60,7 @@ export const BlockchainMenu = () => {
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-blue-600" />
+              <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               Blockchain Diploma Verification
             </DialogTitle>
             <DialogDescription>
@@ -90,8 +90,8 @@ export const BlockchainMenu = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4">
-                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                    <Hash className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-lg">
+                    <Hash className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-sm">1. Content Hashing</h4>
                       <p className="text-xs text-muted-foreground">
@@ -101,8 +101,8 @@ export const BlockchainMenu = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
-                    <Shield className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 bg-green-500/10 rounded-lg">
+                    <Shield className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-sm">2. certera.ink Signature</h4>
                       <p className="text-xs text-muted-foreground">
@@ -112,8 +112,8 @@ export const BlockchainMenu = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
-                    <Link className="w-5 h-5 text-purple-600 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 bg-purple-500/10 rounded-lg">
+                    <Link className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-sm">3. Blockchain Storage</h4>
                       <p className="text-xs text-muted-foreground">
@@ -123,8 +123,8 @@ export const BlockchainMenu = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
-                    <CheckCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 bg-amber-500/10 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-sm">4. Verification</h4>
                       <p className="text-xs text-muted-foreground">
@@ -146,7 +146,7 @@ export const BlockchainMenu = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-blue-600" />
+                      <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       Tamper-Proof
                     </h4>
                     <p className="text-xs text-muted-foreground">
@@ -157,7 +157,7 @@ export const BlockchainMenu = () => {
 
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-green-600" />
+                      <Clock className="w-4 h-4 text-green-600 dark:text-green-400" />
                       Permanent Record
                     </h4>
                     <p className="text-xs text-muted-foreground">
@@ -168,7 +168,7 @@ export const BlockchainMenu = () => {
 
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-purple-600" />
+                      <CheckCircle className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                       Global Verification
                     </h4>
                     <p className="text-xs text-muted-foreground">
@@ -179,7 +179,7 @@ export const BlockchainMenu = () => {
 
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm flex items-center gap-2">
-                      <Link className="w-4 h-4 text-amber-600" />
+                      <Link className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                       No Central Authority
                     </h4>
                     <p className="text-xs text-muted-foreground">

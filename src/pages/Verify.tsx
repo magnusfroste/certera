@@ -20,6 +20,13 @@ interface DiplomaRecord {
   created_at: string;
 }
 
+interface HederaSealData {
+  hederaTxId?: string;
+  hederaTopicId?: string;
+  hederaSequenceNumber?: string;
+  hederaExplorerUrl?: string;
+}
+
 const Verify = () => {
   const { diplomaId: urlDiplomaId } = useParams();
   const navigate = useNavigate();
@@ -29,7 +36,7 @@ const Verify = () => {
   const [verificationResult, setVerificationResult] = useState<{
     isValid: boolean;
     record?: DiplomaRecord;
-    hederaData?: any;
+    hederaData?: HederaSealData | null;
     issues: string[];
   } | null>(null);
 
@@ -73,7 +80,7 @@ const Verify = () => {
       if (expectedSig !== diplomaData.signature) issues.push('Invalid signature');
 
       // Parse Hedera data
-      let hederaData: any = null;
+      let hederaData: HederaSealData | null = null;
       try { hederaData = JSON.parse(diplomaData.diplomator_seal); } catch { /* legacy */ }
 
       setVerificationResult({ isValid: issues.length === 0, record: diplomaData, hederaData, issues });

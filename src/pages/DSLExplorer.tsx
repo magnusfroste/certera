@@ -30,6 +30,7 @@ const BlockPreview = ({ html, css, label, width = 280, height = 180 }: { html: s
   return (
     <div className="flex flex-col items-center gap-2">
       <iframe
+        sandbox=""
         srcDoc={srcDoc}
         className="border border-border rounded-md bg-white"
         style={{ width, height, pointerEvents: 'none' }}
