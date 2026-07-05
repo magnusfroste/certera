@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, lazy, Suspense } from 'react';
-import { Download, Code, Eye, Maximize, Save, X, Share, Shield, Pencil, Loader2 } from 'lucide-react';
+import { Download, Code, Eye, Maximize, Save, X, Share, Shield, Pencil, Loader2, Undo2 } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { AnimationTemplates } from '@/components/AnimationTemplates';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ const TabLoader = () => (
 );
 
 export const PreviewPanel = () => {
-  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl } = useDiploma();
+  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const [editableHtml, setEditableHtml] = useState(diplomaHtml || '');
@@ -55,10 +55,9 @@ export const PreviewPanel = () => {
   }, [editableHtml, editableCss, diplomaHtml, diplomaCss]);
 
   const handleSave = () => {
-    setDiplomaHtml(editableHtml);
-    setDiplomaCss(editableCss);
-    // Hand-edited code no longer matches the structured design
-    setDiplomaDsl(null);
+    // Route through commitDesign so a manual save is undoable. Hand-edited
+    // code no longer matches the structured design, so drop the DSL.
+    commitDesign({ html: editableHtml, css: editableCss, dsl: null });
     setHasUnsavedChanges(false);
   };
 
@@ -247,6 +246,17 @@ export const PreviewPanel = () => {
           </TabsList>
 
           <div className="flex gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+              onClick={undoDesign}
+              disabled={!canUndo}
+              aria-label="Undo last design change"
+              title="Undo last change"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </Button>
             <AnimationTemplates />
             <Toggle
               size="sm"

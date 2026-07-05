@@ -12,6 +12,12 @@ interface DiplomaFields {
   date: string;
 }
 
+interface DesignSnapshot {
+  html: string;
+  css: string;
+  dsl: Json | null;
+}
+
 interface DiplomaContextType {
   diplomaHtml: string;
   setDiplomaHtml: (html: string) => void;
@@ -20,6 +26,11 @@ interface DiplomaContextType {
   /** Structured design (DSL) matching the current HTML/CSS, or null after manual edits */
   diplomaDsl: Json | null;
   setDiplomaDsl: (dsl: Json | null) => void;
+  /** Apply a new design and push the previous one onto the undo history */
+  commitDesign: (next: DesignSnapshot) => void;
+  /** Restore the previous design; no-op when there is nothing to undo */
+  undoDesign: () => void;
+  canUndo: boolean;
   isGenerating: boolean;
   setIsGenerating: (generating: boolean) => void;
   messages: Message[];
@@ -54,6 +65,8 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   const [diplomaHtml, setDiplomaHtml] = useState('');
   const [diplomaCss, setDiplomaCss] = useState('');
   const [diplomaDsl, setDiplomaDsl] = useState<Json | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const historyRef = useRef<DesignSnapshot[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [signingRecipientName, setSigningRecipientName] = useState('');
   const [signingInstitutionName, setSigningInstitutionName] = useState('');
@@ -82,6 +95,36 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => { formatRef.current = diplomaFormat; }, [diplomaFormat]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
+
+  // ── Design history (undo) ──
+  const MAX_HISTORY = 20;
+
+  const applySnapshot = useCallback((snap: DesignSnapshot) => {
+    htmlRef.current = snap.html;
+    cssRef.current = snap.css;
+    dslRef.current = snap.dsl;
+    setDiplomaHtml(snap.html);
+    setDiplomaCss(snap.css);
+    setDiplomaDsl(snap.dsl);
+  }, []);
+
+  const commitDesign = useCallback((next: DesignSnapshot) => {
+    const current: DesignSnapshot = { html: htmlRef.current, css: cssRef.current, dsl: dslRef.current };
+    // Only record a history step when there's a real, changed previous design
+    if (current.html && (current.html !== next.html || current.css !== next.css)) {
+      historyRef.current.push(current);
+      if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
+      setCanUndo(true);
+    }
+    applySnapshot(next);
+  }, [applySnapshot]);
+
+  const undoDesign = useCallback(() => {
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    setCanUndo(historyRef.current.length > 0);
+    applySnapshot(prev);
+  }, [applySnapshot]);
 
   // ── Save session (reads from refs, no stale closures) ──
   const saveSession = useCallback(async (title?: string) => {
@@ -163,6 +206,8 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     setDiplomaHtml('');
     setDiplomaCss('');
     setDiplomaDsl(null);
+    historyRef.current = [];
+    setCanUndo(false);
     const saved = localStorage.getItem('diplomaFormat');
     setDiplomaFormat(saved === 'landscape' || saved === 'portrait' ? saved : 'portrait');
     setDiplomaFields(EMPTY_FIELDS);
@@ -189,6 +234,9 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
 
     sessionIdRef.current = data.id;
     setCurrentSessionId(data.id);
+    // Loading a session starts a fresh undo history
+    historyRef.current = [];
+    setCanUndo(false);
     setDiplomaHtml(data.diploma_html);
     setDiplomaCss(data.diploma_css);
     setDiplomaDsl(data.diploma_dsl ?? null);
@@ -213,6 +261,9 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
       setDiplomaCss,
       diplomaDsl,
       setDiplomaDsl,
+      commitDesign,
+      undoDesign,
+      canUndo,
       isGenerating,
       setIsGenerating,
       messages,
