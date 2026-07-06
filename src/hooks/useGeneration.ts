@@ -1,8 +1,23 @@
 import { useCallback } from 'react';
 import { useDiploma } from '@/contexts/DiplomaContext';
+import { supabase } from '@/integrations/supabase/client';
 import { generateDiploma, generateDiplomaFromImage, generateDiplomaFromUrl } from '@/services/anthropicService';
+import { renderDiplomaDSL } from '@/diploma-dsl/renderer';
 import type { Message } from '@/contexts/DiplomaContext';
 import type { ChatMessage } from '@/services/anthropicService';
+import type { DiplomaRecipe } from '@/constants/diplomaRecipes';
+
+/** Resolve the signed-in user's display name for template recipient text. */
+async function resolveRecipientName(): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return 'Your Name';
+    const { data } = await supabase.from('profiles').select('name').eq('id', user.id).maybeSingle();
+    return data?.name || user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Your Name';
+  } catch {
+    return 'Your Name';
+  }
+}
 
 interface GuestAccess {
   remainingGenerations: number;
@@ -39,6 +54,7 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
     diplomaDsl,
     commitDesign,
     diplomaFormat,
+    setDiplomaFormat,
   } = useDiploma();
 
   const applyResponse = useCallback(
@@ -155,10 +171,35 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
     [isGenerating, setIsGenerating, setMessages, applyResponse, addError],
   );
 
+  /**
+   * Apply a curated template deterministically — no AI call. The exact recipe
+   * DSL is rendered (the same renderer the gallery thumbnail uses), so what you
+   * clicked is what you get, instantly. The DSL is kept as the current design,
+   * so chat iteration works from there.
+   */
+  const applyRecipe = useCallback(
+    async (recipe: DiplomaRecipe) => {
+      if (isGenerating) return;
+      const name = await resolveRecipientName();
+      const dsl = { ...recipe.dsl, body: { ...recipe.dsl.body, recipientName: name } };
+      const { html, css } = renderDiplomaDSL(dsl);
+
+      setDiplomaFormat(dsl.layout.orientation);
+      setMessages((prev: Message[]) => [
+        ...prev,
+        createMessage(`Start from the ${recipe.label} template`, true),
+        createMessage("Here's your template — describe any changes and I'll update it.", false),
+      ]);
+      commitDesign({ html, css, dsl: dsl as Parameters<typeof commitDesign>[0]['dsl'] });
+    },
+    [isGenerating, setMessages, setDiplomaFormat, commitDesign],
+  );
+
   return {
     isGenerating,
     generateFromText,
     generateFromImage,
     generateFromUrl,
+    applyRecipe,
   };
 }
