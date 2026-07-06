@@ -86,7 +86,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
               <ResizableHandle withHandle className="bg-border hover:bg-primary/30 transition-colors data-[resize-handle-active]:bg-primary/50" />
               <ResizablePanel defaultSize={70} minSize={50} maxSize={80}>
                 <div className="h-full bg-card/30 animate-canvas-reveal">
-                  <PreviewPanel />
+                  <PreviewPanel isGuest={isGuest} />
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>

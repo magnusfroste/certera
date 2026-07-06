@@ -46,10 +46,20 @@ const LoadingFallback = () => (
 
 const App = () => {
   useEffect(() => {
+    // App mounted successfully → chunks loaded; clear the one-shot reload guard
+    // so a future genuine chunk failure is allowed to reload once again.
+    sessionStorage.removeItem("chunk-reload-attempted");
     const handleRejection = (event: PromiseRejectionEvent) => {
       if (event.reason?.message?.includes("Failed to fetch dynamically imported module")) {
-        console.warn("Dynamic import failed, reloading in 2s...", event.reason);
         event.preventDefault();
+        // Reload at most once — a genuinely missing chunk would otherwise loop forever.
+        const KEY = "chunk-reload-attempted";
+        if (sessionStorage.getItem(KEY)) {
+          console.error("Dynamic import still failing after reload; not reloading again.", event.reason);
+          return;
+        }
+        sessionStorage.setItem(KEY, "1");
+        console.warn("Dynamic import failed, reloading in 2s...", event.reason);
         setTimeout(() => window.location.reload(), 2000);
       }
     };
