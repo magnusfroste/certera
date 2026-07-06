@@ -4,28 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, CheckCircle, XCircle, Search, Home, Clock, Building, Hash, User, ExternalLink } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Shield, CheckCircle, XCircle, Search, Home, Clock, Building, Hash, User, ExternalLink, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface DiplomaRecord {
-  blockchain_id: string;
-  recipient_name: string;
-  institution_name: string;
-  diploma_html: string;
-  diploma_css: string;
-  content_hash: string;
-  signature: string;
-  diplomator_seal: string;
-  created_at: string;
-}
-
-interface HederaSealData {
-  hederaTxId?: string;
-  hederaTopicId?: string;
-  hederaSequenceNumber?: string;
-  hederaExplorerUrl?: string;
-}
+import { verifyDiploma, type VerifyResult } from '@/services/hederaVerification';
 
 const Verify = () => {
   const { diplomaId: urlDiplomaId } = useParams();
@@ -33,61 +14,24 @@ const Verify = () => {
   const [diplomaId, setDiplomaId] = useState(urlDiplomaId || '');
   const [recipientName, setRecipientName] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<{
-    isValid: boolean;
-    record?: DiplomaRecord;
-    hederaData?: HederaSealData | null;
-    issues: string[];
-  } | null>(null);
+  const [result, setResult] = useState<VerifyResult | null>(null);
 
   useEffect(() => {
     if (urlDiplomaId) setDiplomaId(urlDiplomaId);
   }, [urlDiplomaId]);
-
-  const sha256 = async (data: string): Promise<string> => {
-    const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  };
 
   const handleVerification = async () => {
     if (!diplomaId.trim()) { toast.error('Please enter a diploma ID'); return; }
     if (!recipientName.trim()) { toast.error('Please enter the recipient name'); return; }
 
     setIsVerifying(true);
-    const issues: string[] = [];
-
     try {
-      const { data: diplomaData, error } = await supabase
-        .from('signed_diplomas').select('*')
-        .eq('blockchain_id', diplomaId.trim()).maybeSingle();
-
-      if (error) { issues.push(`Database error: ${error.message}`); setVerificationResult({ isValid: false, issues }); return; }
-      if (!diplomaData) { issues.push('Diploma not found on blockchain'); setVerificationResult({ isValid: false, issues }); return; }
-
-      // Verify recipient — tolerant of case, leading/trailing and repeated spaces
-      const normalizeName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ');
-      if (normalizeName(diplomaData.recipient_name) !== normalizeName(recipientName)) {
-        issues.push('Recipient name does not match');
-      }
-
-      // Verify content hash
-      const currentHash = await sha256(diplomaData.diploma_html + diplomaData.diploma_css);
-      if (currentHash !== diplomaData.content_hash) issues.push('Content has been tampered with');
-
-      // Verify signature
-      const DIPLOMATOR_PRIVATE_KEY = 'diplomator_secure_key_2024';
-      const expectedSig = await sha256(`${diplomaData.content_hash}:${diplomaData.recipient_name}:${DIPLOMATOR_PRIVATE_KEY}`);
-      if (expectedSig !== diplomaData.signature) issues.push('Invalid signature');
-
-      // Parse Hedera data
-      let hederaData: HederaSealData | null = null;
-      try { hederaData = JSON.parse(diplomaData.diplomator_seal); } catch { /* legacy */ }
-
-      setVerificationResult({ isValid: issues.length === 0, record: diplomaData, hederaData, issues });
-      toast[issues.length === 0 ? 'success' : 'error'](issues.length === 0 ? 'Verification successful! ✅' : 'Verification failed! ❌');
+      const res = await verifyDiploma(diplomaId, recipientName);
+      setResult(res);
+      if (res.error) toast.error(res.error);
+      else toast[res.verified ? 'success' : 'error'](res.verified ? 'Verification successful! ✅' : 'Verification failed! ❌');
     } catch {
-      setVerificationResult({ isValid: false, issues: ['Unexpected error during verification'] });
+      setResult({ verified: false, onChainVerified: false, checks: [], error: 'Unexpected error during verification' });
     } finally {
       setIsVerifying(false);
     }
@@ -132,62 +76,91 @@ const Verify = () => {
                 {isVerifying ? 'Verifying on Hedera...' : 'Verify on Blockchain'}
               </Button>
 
-              {verificationResult && (
-                <div className={`p-4 rounded-lg border ${verificationResult.isValid ? 'bg-primary/10 border-primary/20' : 'bg-destructive/10 border-destructive/20'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {verificationResult.isValid
+              {result && (
+                <div className={`p-4 rounded-lg border ${result.error ? 'bg-destructive/10 border-destructive/20' : result.verified ? 'bg-primary/10 border-primary/20' : 'bg-destructive/10 border-destructive/20'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {result.verified && !result.error
                       ? <CheckCircle className="w-5 h-5 text-primary" />
                       : <XCircle className="w-5 h-5 text-destructive" />}
                     <h4 className="font-medium">
-                      {verificationResult.isValid ? 'Verification Successful' : 'Verification Failed'}
+                      {result.error ? 'Could Not Verify' : result.verified ? 'Verification Successful' : 'Verification Failed'}
                     </h4>
                   </div>
 
-                  {verificationResult.isValid && verificationResult.record && (
-                    <div className="space-y-3 mt-3">
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span>{verificationResult.record.recipient_name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Building className="w-4 h-4 text-muted-foreground" />
-                          <span>{verificationResult.record.institution_name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span>{new Date(verificationResult.record.created_at).toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Hash className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-mono text-xs">{verificationResult.record.content_hash.substring(0, 20)}...</span>
-                        </div>
+                  {result.error && <p className="text-sm text-destructive mt-1">{result.error}</p>}
+
+                  {!result.error && (
+                    <>
+                      {/* On-chain vs database-only badge */}
+                      <div className="flex items-center gap-1.5 text-xs mb-3">
+                        <Link2 className="w-3.5 h-3.5" />
+                        {result.onChainVerified ? (
+                          <span className="text-primary font-medium">Verified against the Hedera ledger</span>
+                        ) : (
+                          <span className="text-muted-foreground">Checked against the database record only</span>
+                        )}
                       </div>
 
-                      {verificationResult.hederaData && (
-                        <div className="p-3 bg-muted rounded-lg space-y-1.5">
+                      {/* Per-check breakdown */}
+                      <ul className="space-y-1.5 mb-3">
+                        {result.checks.map((c) => (
+                          <li key={c.key} className="flex items-start gap-2 text-sm">
+                            {c.ok
+                              ? <CheckCircle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                              : <XCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />}
+                            <span className={c.ok ? '' : 'text-destructive'}>
+                              {c.label}{c.detail ? ` — ${c.detail}` : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {result.note && <p className="text-xs text-muted-foreground mb-3">{result.note}</p>}
+
+                      {result.record && (
+                        <div className="space-y-2 text-sm border-t border-border pt-3">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span>{result.record.recipient_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Building className="w-4 h-4 text-muted-foreground" />
+                            <span>{result.record.institution_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            <span>{new Date(result.record.created_at).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Hash className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-mono text-xs">{result.record.content_hash.substring(0, 20)}…</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {result.hcs && (
+                        <div className="p-3 bg-muted rounded-lg space-y-1.5 mt-3">
                           <p className="text-xs font-medium text-muted-foreground">HEDERA CONSENSUS SERVICE</p>
-                          <p className="text-xs font-mono">Topic: {verificationResult.hederaData.hederaTopicId}</p>
-                          <p className="text-xs font-mono">Seq: #{verificationResult.hederaData.hederaSequenceNumber}</p>
-                          {verificationResult.hederaData.hederaExplorerUrl && (
+                          <p className="text-xs font-mono break-all">Topic: {result.hcs.topicId}</p>
+                          <p className="text-xs font-mono">Seq: #{result.hcs.sequenceNumber}</p>
+                          {result.hcs.consensusTimestamp && (
+                            <p className="text-xs font-mono">Consensus: {result.hcs.consensusTimestamp}</p>
+                          )}
+                          {result.hcs.explorerUrl && (
                             <Button variant="link" size="sm" className="p-0 h-auto text-xs text-primary"
-                              onClick={() => window.open(verificationResult.hederaData.hederaExplorerUrl, '_blank')}>
+                              onClick={() => window.open(result.hcs!.explorerUrl, '_blank')}>
                               <ExternalLink className="w-3 h-3 mr-1" />View on HashScan
                             </Button>
                           )}
                         </div>
                       )}
 
-                      <Button className="w-full" onClick={() => navigate(`/diploma/${verificationResult.record!.blockchain_id}`)}>
-                        <ExternalLink className="w-4 h-4 mr-2" />View Authentic Diploma
-                      </Button>
-                    </div>
-                  )}
-
-                  {!verificationResult.isValid && verificationResult.issues.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-destructive mt-2">
-                      {verificationResult.issues.map((issue, i) => <li key={i}>{issue}</li>)}
-                    </ul>
+                      {result.verified && result.record && (
+                        <Button className="w-full mt-3" onClick={() => navigate(`/diploma/${result.record!.blockchain_id}`)}>
+                          <ExternalLink className="w-4 h-4 mr-2" />View Authentic Diploma
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
