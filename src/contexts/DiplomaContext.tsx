@@ -190,9 +190,12 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     }
     if (wasGenerating.current && htmlRef.current) {
       wasGenerating.current = false;
+      // Title from the FIRST prompt so it describes the diploma and stays
+      // stable across iterations (was the last message, which renamed the
+      // session to whatever tweak came last, e.g. "make the border gold").
       const userMessages = messagesRef.current.filter(m => m.isUser);
-      const lastUserMsg = userMessages[userMessages.length - 1]?.content || '';
-      const autoTitle = lastUserMsg.slice(0, 50) || 'Untitled Diploma';
+      const firstUserMsg = userMessages[0]?.content || '';
+      const autoTitle = firstUserMsg.slice(0, 50) || 'Untitled Diploma';
       saveSession(autoTitle);
     }
   }, [isGenerating, saveSession]);

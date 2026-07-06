@@ -278,6 +278,10 @@ export const SharePanel = () => {
           )}
         </div>
 
+        {/* Share Link + Social — only meaningful once a real diploma URL exists.
+            Before signing, shareUrl is just the app URL, which shows recipients nothing. */}
+        {isSignedDiploma && currentDiplomaId && (
+        <>
         {/* Share Link Section */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold">Share Link</h4>
@@ -359,6 +363,8 @@ export const SharePanel = () => {
             </WhatsappShareButton>
           </div>
         </div>
+        </>
+        )}
       </CardContent>
     </Card>
   );

@@ -17,7 +17,24 @@ const TabLoader = () => (
   </div>
 );
 
-export const PreviewPanel = () => {
+const GuestSignShareCta = ({ action }: { action: 'sign' | 'share' }) => (
+  <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 text-center space-y-3">
+    <Shield className="w-8 h-8 text-primary mx-auto" />
+    <h3 className="text-sm font-semibold text-foreground">
+      Create an account to {action === 'sign' ? 'sign & verify' : 'share'} your diploma
+    </h3>
+    <p className="text-xs text-muted-foreground">
+      {action === 'sign'
+        ? 'Signing records your diploma on the Hedera blockchain — that needs a free account.'
+        : 'Sharable links and QR codes are created when you sign a diploma to the blockchain.'}
+    </p>
+    <a href="/auth" className="inline-block">
+      <Button size="sm">Create free account →</Button>
+    </a>
+  </div>
+);
+
+export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
   const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
@@ -81,22 +98,22 @@ export const PreviewPanel = () => {
               margin: 0;
               padding: 40px;
               font-family: 'Inter', system-ui, sans-serif;
-              background: #121212;
+              background: transparent;
               min-height: 100vh;
               display: flex;
               align-items: center;
               justify-content: center;
             }
             .placeholder {
-              background: #1a1a1a;
+              background: rgba(127,127,127,0.06);
               padding: 60px;
               border-radius: 16px;
               text-align: center;
               max-width: 500px;
-              border: 1px solid #2a2a2a;
+              border: 1px solid rgba(127,127,127,0.18);
             }
             .placeholder h1 {
-              color: #e8e8e8;
+              color: #555;
               margin-bottom: 16px;
               font-size: 22px;
               font-weight: 500;
@@ -368,17 +385,25 @@ export const PreviewPanel = () => {
 
           <TabsContent value="sign" className="flex-1 p-3 m-0">
             <div className="max-w-md mx-auto">
-              <Suspense fallback={<TabLoader />}>
-                <BlockchainSigner />
-              </Suspense>
+              {isGuest ? (
+                <GuestSignShareCta action="sign" />
+              ) : (
+                <Suspense fallback={<TabLoader />}>
+                  <BlockchainSigner />
+                </Suspense>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="share" className="flex-1 p-3 m-0">
             <div className="max-w-md mx-auto">
-              <Suspense fallback={<TabLoader />}>
-                <SharePanel />
-              </Suspense>
+              {isGuest ? (
+                <GuestSignShareCta action="share" />
+              ) : (
+                <Suspense fallback={<TabLoader />}>
+                  <SharePanel />
+                </Suspense>
+              )}
             </div>
           </TabsContent>
         </div>

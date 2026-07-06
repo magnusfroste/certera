@@ -213,9 +213,9 @@ export const BlockchainMenu = () => {
               <CardContent>
                 <div className="text-xs space-y-2 font-mono bg-muted p-3 rounded">
                   <p><strong>Hashing:</strong> SHA-256 cryptographic hash function</p>
-                  <p><strong>Storage:</strong> Simulated blockchain (production ready for real chains)</p>
-                  <p><strong>Signature:</strong> certera.ink private key + content hash + recipient</p>
-                  <p><strong>Verification:</strong> Content hash matching + signature validation</p>
+                  <p><strong>Storage:</strong> Hedera Consensus Service (public distributed ledger)</p>
+                  <p><strong>Record:</strong> Content hash + recipient hash submitted to an HCS topic</p>
+                  <p><strong>Verification:</strong> Diploma ID + recipient name checked against the on-chain record</p>
                 </div>
               </CardContent>
             </Card>
