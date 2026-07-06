@@ -18,7 +18,7 @@ interface ChatLandingProps {
 
 export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
   const [message, setMessage] = useState('');
-  const { isGenerating, generateFromText, generateFromImage, generateFromUrl } = useGeneration(isGuest, guestAccess);
+  const { isGenerating, generateFromText, generateFromImage, generateFromUrl, applyRecipe } = useGeneration(isGuest, guestAccess);
 
   const handleSendMessage = async () => {
     const text = message;
@@ -46,10 +46,10 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
           <p className="text-muted-foreground text-sm max-w-md mx-auto">Describe your vision, upload an image, or let the AI design it for you.</p>
         </div>
 
-        {/* Visual recipe gallery — pick a style to generate from, or describe your own below */}
+        {/* Visual recipe gallery — pick a template to start from it exactly, or describe your own below */}
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Pick a style to start — or describe your own below.</p>
-          <RecipeGallery onPick={generateFromText} disabled={isGenerating} />
+          <p className="text-xs text-muted-foreground">Pick a template to start from it — or describe your own below.</p>
+          <RecipeGallery onPick={applyRecipe} disabled={isGenerating} />
         </div>
 
         <div className="relative bg-card border border-border rounded-2xl shadow-lg shadow-black/20">
