@@ -7,7 +7,7 @@
 //
 // Keep every recipe within blocks the client renderer supports (background,
 // border, header, body, seal, signature) so thumbnail === result.
-import type { DiplomaDSL } from '@/diploma-dsl/types';
+import type { DiplomaDSL } from '@/diploma-dsl/render';
 
 export type RecipeCategory = 'Academic' | 'Professional' | 'Award' | 'Course';
 
@@ -44,6 +44,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A classic university diploma with a formal serif design, ornate border and a laurel-wreath seal.',
     dsl: {
       brand: { name: 'Ashford University', primaryColor: '#0f1b3d', accentColor: '#c9a84c' },
+      palette: 'parchment-burgundy',
+      typography: { pair: 'serif-classic' },
       layout: { orientation: 'landscape', padding: 'spacious' },
       background: { style: 'parchment' },
       header: { style: 'serif-centered', institutionName: 'Ashford University', subtitle: 'Est. 1897' },
@@ -60,6 +62,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A formal portrait diploma with an ornamental border and classical seal.',
     dsl: {
       brand: { name: 'St. Aldwin College', primaryColor: '#1a1a2e', accentColor: '#b08d57' },
+      palette: 'ivory-navy',
+      typography: { pair: 'display-editorial' },
       layout: { orientation: 'portrait', padding: 'spacious' },
       background: { style: 'ivory' },
       header: { style: 'monumental', institutionName: 'St. Aldwin College', subtitle: 'Faculty of Letters' },
@@ -77,6 +81,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A modern minimalist tech bootcamp completion certificate with clean lines and a digital signature.',
     dsl: {
       brand: { name: 'Nova Academy', primaryColor: '#0c2a3a', accentColor: '#2d8a9e' },
+      palette: 'arctic-steel',
+      typography: { pair: 'sans-modern' },
       layout: { orientation: 'landscape', padding: 'normal' },
       background: { style: 'clean-white' },
       header: { style: 'minimal', institutionName: 'NOVA ACADEMY', subtitle: 'Software Engineering' },
@@ -93,6 +99,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A friendly course completion certificate with a clean layout and a star seal.',
     dsl: {
       brand: { name: 'Bright Learning', primaryColor: '#1f3a5f', accentColor: '#e0a92e' },
+      palette: 'coastal-fresh',
+      typography: { pair: 'sans-modern' },
       layout: { orientation: 'landscape', padding: 'normal' },
       background: { style: 'gradient-cool' },
       header: { style: 'bold-caps', institutionName: 'BRIGHT LEARNING', subtitle: 'Online Courses' },
@@ -109,6 +117,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A warm workshop attendance certificate with a soft background and rosette seal.',
     dsl: {
       brand: { name: 'Craft Studio', primaryColor: '#5c2018', accentColor: '#c17c74' },
+      palette: 'desert-clay',
+      typography: { pair: 'script-romantic' },
       layout: { orientation: 'landscape', padding: 'normal' },
       background: { style: 'gradient-warm' },
       header: { style: 'elegant-script', institutionName: 'Craft Studio', subtitle: 'Hands-on Workshops' },
@@ -126,6 +136,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A corporate professional certification with an art-deco frame and shield seal.',
     dsl: {
       brand: { name: 'Meridian Institute', primaryColor: '#2d3748', accentColor: '#3b6fa0' },
+      palette: 'marble-emerald',
+      typography: { pair: 'sans-modern' },
       layout: { orientation: 'landscape', padding: 'normal' },
       background: { style: 'marble' },
       header: { style: 'bold-caps', institutionName: 'MERIDIAN INSTITUTE', subtitle: 'Professional Standards' },
@@ -142,10 +154,12 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A membership certificate with a marble background and compass seal.',
     dsl: {
       brand: { name: 'Cartographers Guild', primaryColor: '#0c2340', accentColor: '#c9a84c' },
+      palette: 'linen-charcoal',
+      typography: { pair: 'serif-classic' },
       layout: { orientation: 'landscape', padding: 'normal' },
       background: { style: 'linen' },
       header: { style: 'serif-centered', institutionName: 'Cartographers Guild', subtitle: 'Founded 1921' },
-      border: { style: 'celtic-knot' },
+      border: { style: 'double-line' },
       body: body('Certificate of Membership', 'is hereby admitted as a full member in good standing.', 'Full Member'),
       seal: { style: 'compass', position: 'bottom-right', text: 'N' },
       signature: { style: 'stamp', name: 'Guild Office', title: 'Registrar' },
@@ -158,10 +172,12 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A portrait professional certificate with a clean modern header and shield seal.',
     dsl: {
       brand: { name: 'Atlas Certification', primaryColor: '#14324a', accentColor: '#2d8a9e' },
+      palette: 'arctic-steel',
+      typography: { pair: 'sans-modern' },
       layout: { orientation: 'portrait', padding: 'spacious' },
       background: { style: 'clean-white' },
       header: { style: 'modern-left', institutionName: 'Atlas Certification', subtitle: 'Accredited Body' },
-      border: { style: 'geometric-deco' },
+      border: { style: 'art-deco' },
       body: body('Certificate of Qualification', 'has demonstrated the required competencies and is awarded this professional qualification.', 'Certified Analyst'),
       seal: { style: 'shield', position: 'bottom-center', text: 'QUALIFIED' },
       signature: { style: 'digital', name: 'R. Adeyemi', title: 'Assessor' },
@@ -175,6 +191,8 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'An elegant gold-bordered award with a flowing script header and an ornamental frame.',
     dsl: {
       brand: { name: 'Belle Académie', primaryColor: '#5b2c20', accentColor: '#c6a961' },
+      palette: 'ivory-navy',
+      typography: { pair: 'script-romantic' },
       layout: { orientation: 'landscape', padding: 'spacious' },
       background: { style: 'ivory' },
       header: { style: 'elegant-script', institutionName: 'Belle Académie', subtitle: 'School of Fine Arts' },
@@ -191,10 +209,12 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A premium dark award with gold accents on a deep navy background and a star seal.',
     dsl: {
       brand: { name: 'Apex Institute', primaryColor: '#f0e6d3', accentColor: '#c6a961' },
+      palette: 'midnight-gold',
+      typography: { pair: 'display-editorial' },
       layout: { orientation: 'landscape', padding: 'spacious' },
       background: { style: 'cosmic-dark' },
       header: { style: 'monumental', institutionName: 'APEX INSTITUTE', subtitle: 'Executive Education' },
-      border: { style: 'geometric-deco', color: '#c6a961' },
+      border: { style: 'art-deco', color: '#c6a961' },
       body: body('Award of Distinction', 'is recognized for exceptional leadership and measurable impact.', 'Executive Leadership'),
       seal: { style: 'star', position: 'bottom-right' },
       signature: { style: 'elegant', name: 'R. Vance', title: 'President' },
@@ -207,10 +227,12 @@ export const DIPLOMA_RECIPES: DiplomaRecipe[] = [
     prompt: 'A botanical-themed certificate with vine borders and soft greens.',
     dsl: {
       brand: { name: 'Green Roots Institute', primaryColor: '#1a3c2a', accentColor: '#8b7355' },
+      palette: 'forest-cream',
+      typography: { pair: 'serif-classic' },
       layout: { orientation: 'landscape', padding: 'spacious' },
       background: { style: 'botanical-green' },
       header: { style: 'serif-centered', institutionName: 'Green Roots Institute', subtitle: 'Sustainability Studies' },
-      border: { style: 'botanical-vine' },
+      border: { style: 'wave' },
       body: body('Certificate of Distinction', 'has completed the Regenerative Design program with distinction.', 'Regenerative Design'),
       seal: { style: 'rosette', position: 'bottom-right', text: 'AWARD' },
       signature: { style: 'handwriting', name: 'L. Chen', title: 'Head of Studies' },
