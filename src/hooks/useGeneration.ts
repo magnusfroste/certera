@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { supabase } from '@/integrations/supabase/client';
 import { generateDiploma, generateDiplomaFromImage, generateDiplomaFromUrl } from '@/services/anthropicService';
-import { renderDiplomaDSL } from '@/diploma-dsl/renderer';
+import { renderDSL } from '@/diploma-dsl/render';
 import type { Message } from '@/contexts/DiplomaContext';
 import type { ChatMessage } from '@/services/anthropicService';
 import type { DiplomaRecipe } from '@/constants/diplomaRecipes';
@@ -182,9 +182,9 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
       if (isGenerating) return;
       const name = await resolveRecipientName();
       const dsl = { ...recipe.dsl, body: { ...recipe.dsl.body, recipientName: name } };
-      const { html, css } = renderDiplomaDSL(dsl);
+      const { html, css } = renderDSL(dsl);
 
-      setDiplomaFormat(dsl.layout.orientation);
+      setDiplomaFormat(dsl.layout?.orientation === 'portrait' ? 'portrait' : 'landscape');
       setMessages((prev: Message[]) => [
         ...prev,
         createMessage(`Start from the ${recipe.label} template`, true),

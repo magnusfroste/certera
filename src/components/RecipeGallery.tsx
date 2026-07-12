@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { renderDiplomaDSL } from '@/diploma-dsl/renderer';
+import { renderDSL } from '@/diploma-dsl/render';
 import { DIPLOMA_RECIPES, type DiplomaRecipe } from '@/constants/diplomaRecipes';
 
 // Logical width the diploma is rendered at before being scaled into the card.
@@ -10,7 +10,7 @@ const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPi
   const [scale, setScale] = useState(0.3);
 
   // Portrait recipes get a taller logical canvas so the thumbnail isn't cropped.
-  const baseH = recipe.dsl.layout.orientation === 'portrait' ? 1040 : 585;
+  const baseH = recipe.dsl.layout?.orientation === 'portrait' ? 1040 : 585;
 
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -23,7 +23,7 @@ const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPi
   }, []);
 
   const srcDoc = useMemo(() => {
-    const { html, css } = renderDiplomaDSL(recipe.dsl);
+    const { html, css } = renderDSL(recipe.dsl);
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}
       html,body{margin:0}
       body{width:${BASE_W}px;height:${baseH}px;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box}
