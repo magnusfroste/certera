@@ -16,10 +16,17 @@ npm install
 npm run dev       # Vite dev server (config binds host "::" / port 8080;
                   # this sandbox is IPv4-only, so launch with
                   # `npx vite --host 127.0.0.1 --port 5199 --strictPort`)
-npm run build     # production build (tsc + vite)
+npm run build     # typecheck edge functions + vite build
 npm run lint      # eslint — keep this at 0 errors
 npm run preview   # preview a production build
+npm run typecheck:functions  # tsc over supabase/functions/ (also part of build)
 ```
+
+The functions typecheck exists because esbuild/vite leave unbound identifiers
+as runtime globals — a missing import in an edge function once shipped as a
+production `ReferenceError`. `tsconfig.functions.json` + the
+`supabase/functions/deno-shim.d.ts` ambient shim (Deno global, `https:`/`npm:`
+imports) let plain `tsc` catch that class of bug pre-merge.
 
 There is **no test suite**. Verify changes by building, linting, and driving the
 running app (see "Verifying" below). Keep `npm run build` and `npm run lint`
