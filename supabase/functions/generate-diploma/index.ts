@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 
-import { renderDSL, esc, PALETTE_IDS, TYPOGRAPHY_IDS, type DiplomaDSL } from "../_shared/diplomaRenderer.ts";
+import { renderDSL, esc, PALETTES, PALETTE_IDS, TYPOGRAPHY_IDS, type DiplomaDSL } from "../_shared/diplomaRenderer.ts";
 
 // ── Shared request/DSL types ──
 type ContentPart =
