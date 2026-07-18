@@ -2,34 +2,39 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { renderDSL } from '@/diploma-dsl/render';
 import { DIPLOMA_RECIPES, type DiplomaRecipe } from '@/constants/diplomaRecipes';
 
-// Logical width the diploma is rendered at before being scaled into the card.
-const BASE_W = 800;
+// Logical canvas the diploma is rendered at before being scaled into the card.
+// Sized so the tallest recipe fits without clipping (measured across all
+// recipes); portrait recipes render on a narrower canvas (the renderer caps
+// them at 620px wide) so their card is actually portrait-shaped.
+const CANVAS = {
+  landscape: { w: 800, h: 690 },
+  portrait: { w: 660, h: 745 },
+};
 
 const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.3);
 
-  // Portrait recipes get a taller logical canvas so the thumbnail isn't cropped.
-  const baseH = recipe.dsl.layout?.orientation === 'portrait' ? 1040 : 585;
+  const { w: baseW, h: baseH } = CANVAS[recipe.dsl.layout?.orientation === 'portrait' ? 'portrait' : 'landscape'];
 
   useLayoutEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const update = () => setScale(el.clientWidth / BASE_W);
+    const update = () => setScale(el.clientWidth / baseW);
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [baseW]);
 
   const srcDoc = useMemo(() => {
     const { html, css } = renderDSL(recipe.dsl);
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}
       html,body{margin:0}
-      body{width:${BASE_W}px;height:${baseH}px;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box}
+      body{width:${baseW}px;height:${baseH}px;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
       .diploma-container{max-height:100%}
     </style></head><body>${html}</body></html>`;
-  }, [recipe, baseH]);
+  }, [recipe, baseW, baseH]);
 
   return (
     <button
@@ -42,15 +47,15 @@ const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPi
       <div
         ref={boxRef}
         className="relative w-full overflow-hidden rounded-lg border border-border bg-muted/30 shadow-sm transition-colors group-hover:border-primary/50 group-focus-visible:border-primary"
-        style={{ aspectRatio: `${BASE_W} / ${baseH}` }}
+        style={{ aspectRatio: `${baseW} / ${baseH}` }}
       >
-        <div style={{ width: BASE_W, height: baseH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        <div style={{ width: baseW, height: baseH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
           <iframe
             sandbox=""
             srcDoc={srcDoc}
             scrolling="no"
             title={recipe.label}
-            style={{ width: BASE_W, height: baseH, border: 0, pointerEvents: 'none' }}
+            style={{ width: baseW, height: baseH, border: 0, pointerEvents: 'none' }}
           />
         </div>
       </div>

@@ -95,14 +95,17 @@ export const TYPOGRAPHY: Record<string, { heading: string; body: string; script:
 // ─────────────────────────────────────────────────────────────────
 type Composition = 'classic-stack' | 'banner-top' | 'medallion-center' | 'split-horizontal' | 'corner-accent';
 
-function compositionCss(comp: Composition, primary: string, accent: string): string {
+function compositionCss(comp: Composition, primary: string, accent: string, innerPad: string): string {
   switch (comp) {
     case 'banner-top':
-      return `.comp-banner .diploma-header{margin:-1em -1em 1.2em -1em;padding:1.2em;background:${primary};border-radius:2px 2px 0 0}.comp-banner .diploma-header .institution,.comp-banner .diploma-header .subtitle{color:#fff !important}.comp-banner .diploma-header .subtitle{opacity:.85}`;
+      // Bleed the banner to the border edges (cancel the border's inner padding)
+      return `.comp-banner .diploma-header{margin:-${innerPad} -${innerPad} 1.2em -${innerPad};padding:1em ${innerPad};background:${primary};border-radius:2px 2px 0 0}.comp-banner .diploma-header .institution,.comp-banner .diploma-header .subtitle{color:#fff !important}.comp-banner .diploma-header .subtitle{opacity:.85}`;
     case 'medallion-center':
       return `.comp-medallion .diploma-bottom-row{flex-direction:column;align-items:center;gap:1em}.comp-medallion .diploma-seal-wrapper{justify-content:center !important;order:-1;margin-top:0;margin-bottom:.5em}`;
     case 'split-horizontal':
-      return `.comp-split{display:grid;grid-template-columns:1fr 2fr;gap:2em;align-items:center}.comp-split .diploma-header{text-align:left;border-right:2px solid ${accent}40;padding-right:1.5em;margin-bottom:0}.comp-split .diploma-header .institution{text-align:left}.comp-split-content{display:flex;flex-direction:column;gap:.5em}`;
+      // Grid goes on the border box — the container's only child is the border,
+      // so a grid on the container would squeeze everything into one column.
+      return `.comp-split .diploma-border{display:grid;grid-template-columns:1fr 2fr;gap:2em;align-items:center}.comp-split .diploma-header{text-align:left;border-right:2px solid ${accent}40;padding-right:1.5em;margin-bottom:0}.comp-split .diploma-header .institution{text-align:left}.comp-split-content{display:flex;flex-direction:column;gap:.5em}`;
     case 'corner-accent':
       // Inset from the edge so the container's overflow:hidden never clips it
       return `.comp-corner{position:relative}.comp-corner::before{content:'';position:absolute;top:14px;left:14px;width:60px;height:60px;border-top:4px solid ${accent};border-left:4px solid ${accent}}.comp-corner::after{content:'';position:absolute;bottom:14px;right:14px;width:60px;height:60px;border-bottom:4px solid ${accent};border-right:4px solid ${accent}}`;
@@ -193,14 +196,17 @@ function getSealHtmlCss(style: string, color: string, text?: string): {html:stri
   // shape or collides with the wreath flanks (e.g. "GREENERY SEAL" → "GREENERY").
   const firstWord = (text || 'VERIFIED').trim().split(/\s+/)[0].slice(0, 10);
   const t = esc(firstWord || 'VERIFIED');
+  // Long tokens (e.g. "CONFERRED") must shrink instead of wrapping/overflowing
+  // the seal shape — computed here because CSS can't branch on text length.
+  const roundFs = firstWord.length > 7 ? 7 : 9;
   const map: Record<string, {html:string;css:string}> = {
-    'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:9px;font-weight:bold;color:${color};letter-spacing:1px;text-transform:uppercase;max-width:60px;text-align:center;line-height:1.15;word-break:break-word}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'classical-round': {css:`.diploma-seal{width:80px;height:80px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:70px;height:70px;border:1px solid ${color}60;border-radius:50%}.diploma-seal .seal-text{font-size:${roundFs}px;font-weight:bold;color:${color};letter-spacing:1px;text-transform:uppercase;max-width:62px;text-align:center;line-height:1.15;white-space:nowrap}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'star': {css:`.diploma-seal{width:80px;height:80px;background:${color};clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);display:flex;align-items:center;justify-content:center;color:white;font-size:20px}`,html:`<div class="diploma-seal">★</div>`},
     'shield': {css:`.diploma-seal{width:70px;height:85px;background:${color};clip-path:polygon(0% 0%,100% 0%,100% 70%,50% 100%,0% 70%);display:flex;align-items:center;justify-content:center;padding-bottom:10px}.diploma-seal .seal-text{color:white;font-size:8px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'ribbon': {css:`.diploma-seal{background:${color};color:white;padding:6px 24px;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;position:relative}.diploma-seal::before,.diploma-seal::after{content:'';position:absolute;bottom:-8px;border:8px solid ${color};border-bottom-color:transparent}.diploma-seal::before{left:0;border-left-color:transparent}.diploma-seal::after{right:0;border-right-color:transparent}`,html:`<div class="diploma-seal">CERTIFIED</div>`},
     'modern-circle': {css:`.diploma-seal{width:60px;height:60px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:${color}}`,html:`<div class="diploma-seal">✓</div>`},
     'rosette': {css:`.diploma-seal{width:80px;height:80px;background:radial-gradient(circle,${color} 30%,transparent 31%),conic-gradient(from 0deg,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60,${color}20,${color}60);border-radius:50%;display:flex;align-items:center;justify-content:center}.diploma-seal .seal-text{color:white;font-size:9px;font-weight:bold;letter-spacing:1px}`,html:`<div class="diploma-seal"><span class="seal-text">AWARD</span></div>`},
-    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal .seal-text{font-size:11px;font-weight:bold;color:${color};max-width:54px;text-align:center;line-height:1.15;letter-spacing:1px;text-transform:uppercase;word-break:break-word}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
+    'compass': {css:`.diploma-seal{width:80px;height:80px;border:2px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'';position:absolute;width:60px;height:60px;border:1px solid ${color}40;transform:rotate(45deg)}.diploma-seal .seal-text{font-size:${firstWord.length > 5 ? 8 : 11}px;font-weight:bold;color:${color};max-width:54px;text-align:center;line-height:1.15;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
     'laurel-wreath': {css:`.diploma-seal{width:112px;height:88px;display:flex;align-items:center;justify-content:center;position:relative}.diploma-seal::before{content:'❧';position:absolute;left:0;top:50%;transform:translateY(-50%) scaleX(-1);color:${color};opacity:.8;font-size:26px}.diploma-seal::after{content:'❧';position:absolute;right:0;top:50%;transform:translateY(-50%);color:${color};opacity:.8;font-size:26px}.diploma-seal .seal-text{max-width:60px;text-align:center;white-space:nowrap;font-size:8px;font-weight:bold;color:${color};letter-spacing:1px;text-transform:uppercase;line-height:1.2;border-top:1px solid ${color}40;border-bottom:1px solid ${color}40;padding:3px 0}`,html:`<div class="diploma-seal"><span class="seal-text">${t}</span></div>`},
   };
   return map[style] || map['classical-round'];
@@ -266,9 +272,17 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   const typId = dsl.typography?.pair || 'serif-classic';
   const typ = TYPOGRAPHY[typId] || TYPOGRAPHY['serif-classic'];
 
-  // Layout
-  const PADDINGS: Record<string, string> = { compact: '24px', normal: '40px', spacious: '60px' };
-  const pad = PADDINGS[dsl.layout?.padding ?? ''] || '40px';
+  // Layout — padding is split in two: OUTER (container edge → border line) and
+  // INNER (border line → content). The inner padding is what keeps headers,
+  // signatures and seals from sitting on the border lines; borders with inner
+  // ornaments (ornamental/classical/art-deco draw lines/corners up to ~12px
+  // inside) need content to clear them too.
+  const PADDINGS: Record<string, { outer: string; inner: string }> = {
+    compact:  { outer: '16px', inner: '22px' },
+    normal:   { outer: '20px', inner: '30px' },
+    spacious: { outer: '26px', inner: '40px' },
+  };
+  const { outer: pad, inner: innerPad } = PADDINGS[dsl.layout?.padding ?? ''] || PADDINGS['normal'];
   const composition: Composition = (dsl.layout?.composition as Composition) || 'classic-stack';
   const COMP_CLASSES: Record<string, string> = {
     'classic-stack':'',
@@ -296,14 +310,18 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
     ? { body:'#ddd', sec:'#ccc', ter:'#aaa', mut:'#999', fnt:'#888' }
     : { body:'#333', sec:'#555', ter:'#666', mut:'#888', fnt:'#aaa' };
 
+  // Portrait diplomas get a narrower canvas so they are actually taller than
+  // wide once text wraps (orientation was previously display-only).
+  const maxW = dsl.layout?.orientation === 'portrait' ? '620px' : '800px';
+
   const cssParts = [
     `@import url('https://fonts.googleapis.com/css2?${typ.gfont}&display=swap');`,
-    `.diploma-container{max-width:800px;width:100%;margin:0 auto;padding:${pad};box-sizing:border-box;overflow:hidden;font-family:${typ.body};color:${t.body};${bgCss}}`,
+    `.diploma-container{max-width:${maxW};width:100%;margin:0 auto;padding:${pad};box-sizing:border-box;overflow:hidden;font-family:${typ.body};color:${t.body};${bgCss}}`,
     getBorderCss(dsl.border?.style || 'classical', safeColor(dsl.border?.color, pc)),
-    `.diploma-border{overflow:visible;position:relative}`,
+    `.diploma-border{overflow:visible;position:relative;padding:${innerPad}}`,
     getHeaderCss(dsl.header?.style || 'serif-centered', pc, typ.heading),
     `.diploma-body{text-align:center;margin:1.2em 0}.diploma-body .diploma-title{font-family:${typ.heading};font-size:32px;font-weight:bold;color:${pc};margin-bottom:0.8em;letter-spacing:2px;text-transform:uppercase}.diploma-body .diploma-pretext{font-family:${typ.body};font-size:14px;color:${t.ter};margin-bottom:0.5em;font-style:italic}.diploma-body .diploma-recipient{font-family:${typ.script};font-size:42px;color:${pc};margin:0.3em 0;border-bottom:2px solid ${ac}40;display:inline-block;padding:0 20px 4px}.diploma-body .diploma-description{font-family:${typ.body};font-size:15px;color:${t.sec};max-width:600px;margin:1em auto;line-height:1.6}.diploma-body .diploma-course{font-family:${typ.heading};font-size:18px;font-weight:bold;color:${pc};margin:0.5em 0}.diploma-body .diploma-date{font-size:13px;color:${t.mut};margin-top:1em}.diploma-body .diploma-fields{margin-top:1em;font-size:13px;color:${t.ter}}.diploma-body .diploma-fields .field-label{font-weight:bold;color:${t.sec}}`,
-    compositionCss(composition, pc, ac),
+    compositionCss(composition, pc, ac, innerPad),
     decorationCss(decos, pc, ac),
   ];
 
@@ -321,7 +339,7 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
 
   const sig = getSignatureHtmlCss(dsl.signature?.style||'handwriting', dsl.signature?.name||'Mr Diploma', dsl.signature?.title, pc, typ.script, typ.heading);
   cssParts.push(sig.css);
-  cssParts.push(`.diploma-footer{text-align:center;margin-top:1.5em;font-size:10px;color:${t.fnt}}.diploma-footer a{color:${t.fnt};text-decoration:none}.diploma-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;margin-top:1.5em}.diploma-bottom-row.no-seal{justify-content:center}`);
+  cssParts.push(`.diploma-footer{text-align:center;margin-top:1em;font-size:10px;color:${t.fnt}}.diploma-footer a{color:${t.fnt};text-decoration:none}.diploma-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;margin-top:1.2em}.diploma-bottom-row.no-seal{justify-content:center}`);
 
   const cleanCustom = sanitizeCustomCss(dsl.customCss || '');
   if (cleanCustom) cssParts.push(cleanCustom);
