@@ -236,7 +236,22 @@ Return the COMPLETE updated design (all fields, not just the changed ones).`;
 // ─────────────────────────────────────────────────────────────────
 // 10. PROVIDER ADAPTERS (structured output, provider-agnostic)
 // ─────────────────────────────────────────────────────────────────
-interface AIResponse { text: string; json?: DiplomaDSL }
+interface TokenUsage { inputTokens: number; outputTokens: number }
+interface AIResponse { text: string; json?: DiplomaDSL; usage?: TokenUsage }
+
+/**
+ * Providers report token counts under different names. Normalise whatever the
+ * response carries; usage is best-effort telemetry, so a missing or malformed
+ * block must never fail a generation.
+ */
+function readUsage(raw: unknown): TokenUsage | undefined {
+  const u = raw as Record<string, number> | undefined;
+  if (!u || typeof u !== 'object') return undefined;
+  const input = u.input_tokens ?? u.prompt_tokens ?? u.promptTokenCount;
+  const output = u.output_tokens ?? u.completion_tokens ?? u.candidatesTokenCount;
+  if (typeof input !== 'number' && typeof output !== 'number') return undefined;
+  return { inputTokens: Number(input) || 0, outputTokens: Number(output) || 0 };
+}
 
 async function callAnthropic(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -256,11 +271,12 @@ async function callAnthropic(systemPrompt: string, messages: AIMessage[], model:
   if (!r.ok) throw new Error(`Anthropic API error ${r.status}: ${(await r.text()).substring(0,300)}`);
   const data = await r.json();
 
+  const usage = readUsage(data.usage);
   if (structured) {
     const toolUse = (data.content || []).find((c: { type: string; input?: DiplomaDSL }) => c.type === 'tool_use');
-    if (toolUse?.input) return { text: JSON.stringify(toolUse.input), json: toolUse.input };
+    if (toolUse?.input) return { text: JSON.stringify(toolUse.input), json: toolUse.input, usage };
   }
-  return { text: data.content?.[0]?.text || '' };
+  return { text: data.content?.[0]?.text || '', usage };
 }
 
 function toOpenAIMessages(systemPrompt: string, messages: AIMessage[]): Array<{ role: string; content: unknown }> {
@@ -296,7 +312,7 @@ async function callOpenAI(systemPrompt: string, messages: AIMessage[], model: st
   if (!r.ok) throw new Error(`OpenAI API error ${r.status}: ${(await r.text()).substring(0,300)}`);
   const data = await r.json();
   const text = data.choices?.[0]?.message?.content || '';
-  return { text };
+  return { text, usage: readUsage(data.usage) };
 }
 
 async function callGemini(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
@@ -329,7 +345,7 @@ async function callGemini(systemPrompt: string, messages: AIMessage[], model: st
   });
   if (!r.ok) throw new Error(`Gemini API error ${r.status}: ${(await r.text()).substring(0,300)}`);
   const data = await r.json();
-  return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
+  return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || '', usage: readUsage(data.usageMetadata) };
 }
 
 async function callOpenRouter(systemPrompt: string, messages: AIMessage[], model: string, structured: boolean): Promise<AIResponse> {
@@ -357,7 +373,7 @@ async function callOpenRouter(systemPrompt: string, messages: AIMessage[], model
   if (!r.ok) throw new Error(`OpenRouter API error ${r.status}: ${(await r.text()).substring(0,300)}`);
   const data = await r.json();
   const text = data.choices?.[0]?.message?.content || '';
-  return { text };
+  return { text, usage: readUsage(data.usage) };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -477,10 +493,12 @@ serve(async (req) => {
     // Derive identity from the token — never trust an isGuest flag from the body.
     const authHeader = req.headers.get('Authorization') ?? '';
     let isAuthenticated = false;
+    let userId: string | null = null;
     if (authHeader.startsWith('Bearer ')) {
       const supabaseAuth = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
       const { data: { user } } = await supabaseAuth.auth.getUser(authHeader.replace('Bearer ', ''));
       isAuthenticated = !!user;
+      userId = user?.id ?? null;
     }
 
     // Guests are allowed a limited number of generations per IP per day,
@@ -584,19 +602,47 @@ serve(async (req) => {
         chain.push({ p, m: defaultModelFor[p] });
       }
     }
+    // Token accounting. Best-effort telemetry: a logging failure must never
+    // break a generation the user already paid for in latency, so this never
+    // throws and is not awaited into the critical path's error handling.
+    const recordUsage = async (
+      p: string, m: string, usage: TokenUsage | undefined, succeeded: boolean, fellBack: boolean,
+    ) => {
+      try {
+        await supabaseAdmin.from('generation_usage').insert({
+          provider: p,
+          model: m,
+          input_tokens: usage?.inputTokens ?? 0,
+          output_tokens: usage?.outputTokens ?? 0,
+          phase: isIteration ? 'iterate' : 'generate',
+          fell_back: fellBack,
+          succeeded,
+          user_id: userId,
+          is_guest: !isAuthenticated,
+        });
+      } catch (e) {
+        console.error('generation_usage insert failed:', e instanceof Error ? e.message : e);
+      }
+    };
+
     let lastErr: unknown;
     let usedProvider = provider;
     let usedModel = model;
     for (const step of chain) {
+      const fellBack = step.p !== provider;
       try {
         result = await callProvider(step.p, step.m);
         usedProvider = step.p;
         usedModel = step.m;
-        if (step.p !== provider) console.warn(`Fell back from ${provider} to ${step.p}`);
+        if (fellBack) console.warn(`Fell back from ${provider} to ${step.p}`);
+        await recordUsage(step.p, step.m, result.usage, true, fellBack);
         break;
       } catch (e) {
         lastErr = e;
         console.error(`Provider ${step.p} failed:`, e instanceof Error ? e.message : e);
+        // Log the failed attempt too — an outage that burns the fallback chain
+        // is exactly what an operator needs to see afterwards.
+        await recordUsage(step.p, step.m, undefined, false, fellBack);
       }
     }
     if (!result!) throw lastErr || new Error('All providers failed');

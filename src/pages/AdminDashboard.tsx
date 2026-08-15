@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, FileText, Home, Loader2, Settings, Layers, Palette } from 'lucide-react';
+import { Shield, Users, FileText, Home, Loader2, Settings, Layers, Palette, KeyRound } from 'lucide-react';
 import AdminIntegrations from '@/components/AdminIntegrations';
 import AdminBranding from '@/components/AdminBranding';
+import AdminOpsTokens from '@/components/AdminOpsTokens';
 import { toast } from 'sonner';
 
 interface DiplomaRow {
@@ -168,6 +169,9 @@ const AdminDashboard = () => {
             <TabsTrigger value="integrations" className="gap-2">
               <Settings className="h-4 w-4" /> Integrations
             </TabsTrigger>
+            <TabsTrigger value="ops-keys" className="gap-2">
+              <KeyRound className="h-4 w-4" /> Ops keys
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="diplomas">
@@ -274,6 +278,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="integrations">
             <AdminIntegrations />
+          </TabsContent>
+
+          <TabsContent value="ops-keys">
+            <AdminOpsTokens />
           </TabsContent>
         </Tabs>
       </div>

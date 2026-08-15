@@ -8,3 +8,8 @@ verify_jwt = false
 
 [functions.hedera-sign]
 verify_jwt = false
+
+# ops-mcp gates itself on OPS_MCP_TOKEN (see the auth section in the function),
+# so Supabase JWT verification is off — MCP clients send their own bearer token.
+[functions.ops-mcp]
+verify_jwt = false
