@@ -77,6 +77,48 @@ export type Database = {
         }
         Relationships: []
       }
+      generation_usage: {
+        Row: {
+          created_at: string
+          fell_back: boolean
+          id: string
+          input_tokens: number
+          is_guest: boolean
+          model: string
+          output_tokens: number
+          phase: string
+          provider: string
+          succeeded: boolean
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          fell_back?: boolean
+          id?: string
+          input_tokens?: number
+          is_guest?: boolean
+          model: string
+          output_tokens?: number
+          phase?: string
+          provider: string
+          succeeded?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          fell_back?: boolean
+          id?: string
+          input_tokens?: number
+          is_guest?: boolean
+          model?: string
+          output_tokens?: number
+          phase?: string
+          provider?: string
+          succeeded?: boolean
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       guest_usage: {
         Row: {
           count: number
