@@ -7,10 +7,11 @@
 // credits?" without opening a dashboard.
 //
 // Transport: Streamable HTTP — JSON-RPC 2.0 over a single POST endpoint.
-// Auth:      Bearer OPS_MCP_TOKEN. This endpoint runs with verify_jwt = false,
-//            so THIS check is the only gate — it must stay strict. The data
-//            here includes personal data (emails, sign-in times), so the token
-//            is a production secret; rotate it via Supabase secrets.
+// Auth:      Bearer token — either a key minted by an admin in /admin (stored
+//            hashed in ops_tokens) or the OPS_MCP_TOKEN secret as break-glass.
+//            This endpoint runs with verify_jwt = false, so THIS check is the
+//            only gate and it must stay strict. The data here includes personal
+//            data (emails, sign-in times), so keys are production credentials.
 //
 // Almost every tool is read-only. The one exception is set_ai_provider, which
 // changes which provider and model serve live generations. That makes the
@@ -57,13 +58,57 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-function isAuthorized(req: Request): boolean {
-  const expected = Deno.env.get('OPS_MCP_TOKEN');
-  // No token configured = endpoint stays shut, rather than open to the world.
-  if (!expected) return false;
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Two ways in, both bearer tokens:
+ *
+ *  1. A key minted by an admin in /admin, stored only as a SHA-256 hash in
+ *     ops_tokens. This is the normal path — keys can be named, revoked and
+ *     rotated without touching Supabase secrets or redeploying.
+ *  2. The OPS_MCP_TOKEN secret, kept as break-glass: if the database is
+ *     unreachable or every key has been revoked by mistake, an operator can
+ *     still get in. It is optional — unset it and only minted keys work.
+ *
+ * Presenting no valid credential of either kind fails closed.
+ */
+async function isAuthorized(req: Request): Promise<boolean> {
   const header = req.headers.get('Authorization') ?? '';
   if (!header.startsWith('Bearer ')) return false;
-  return safeEqual(header.slice('Bearer '.length).trim(), expected);
+  const presented = header.slice('Bearer '.length).trim();
+  if (!presented) return false;
+
+  const envToken = Deno.env.get('OPS_MCP_TOKEN');
+  if (envToken && safeEqual(presented, envToken)) return true;
+
+  // Look the key up by hash — the plaintext is never stored, so a leaked
+  // backup yields nothing usable.
+  const hash = await sha256Hex(presented);
+  const { data, error } = await admin()
+    .from('ops_tokens')
+    .select('id, revoked_at')
+    .eq('token_hash', hash)
+    .maybeSingle();
+  if (error || !data || data.revoked_at) return false;
+
+  // Last-used is what makes an unused or leaked key noticeable in /admin, so it
+  // is awaited rather than fired and forgotten: work started after a response
+  // is returned can be cancelled by the edge runtime, which would silently drop
+  // the write. One extra UPDATE on an ops endpoint is not worth that risk.
+  // A failure to record it must still never deny an otherwise valid request.
+  try {
+    await admin()
+      .from('ops_tokens')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', data.id);
+  } catch (e) {
+    console.error('last_used_at update failed:', e);
+  }
+
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -817,7 +862,7 @@ serve(async (req: Request) => {
     return json({ error: 'This MCP endpoint accepts POST (Streamable HTTP) only.' }, 405);
   }
 
-  if (!isAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return json({ error: 'Unauthorized' }, 401);
   }
 

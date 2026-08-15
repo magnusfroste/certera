@@ -38,6 +38,81 @@ export type Database = {
         }
         Relationships: []
       }
+      generation_usage: {
+        Row: {
+          created_at: string
+          fell_back: boolean
+          id: string
+          input_tokens: number
+          is_guest: boolean
+          model: string
+          output_tokens: number
+          phase: string
+          provider: string
+          succeeded: boolean
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          fell_back?: boolean
+          id?: string
+          input_tokens?: number
+          is_guest?: boolean
+          model: string
+          output_tokens?: number
+          phase?: string
+          provider: string
+          succeeded?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          fell_back?: boolean
+          id?: string
+          input_tokens?: number
+          is_guest?: boolean
+          model?: string
+          output_tokens?: number
+          phase?: string
+          provider?: string
+          succeeded?: boolean
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ops_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          last_used_at: string | null
+          prefix: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          last_used_at?: string | null
+          prefix: string
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          prefix?: string
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: []
+      }
       diploma_sessions: {
         Row: {
           created_at: string

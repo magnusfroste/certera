@@ -1,9 +1,10 @@
 # ops-mcp — operating certera.ink over MCP
 
-A read-only [Model Context Protocol](https://modelcontextprotocol.io) server that
-answers the operator's daily questions — *is the site being used, is anyone
-signing up, are diplomas being issued, and are we out of provider credits?* —
-without opening a dashboard.
+A [Model Context Protocol](https://modelcontextprotocol.io) server that answers
+the operator's daily questions — *is the site being used, is anyone signing up,
+are diplomas being issued, what are we spending, and are we out of provider
+credits?* — without opening a dashboard. Reporting is read-only; the single
+exception is switching the active AI provider.
 
 ## Connecting
 
@@ -16,26 +17,43 @@ authenticates with a bearer token, so any MCP client can use it:
     "certera-ops": {
       "type": "http",
       "url": "https://jiokwdsnmgmcjoyxrwax.supabase.co/functions/v1/ops-mcp",
-      "headers": { "Authorization": "Bearer <OPS_MCP_TOKEN>" }
+      "headers": { "Authorization": "Bearer <your-ops-key>" }
     }
   }
 }
 ```
 
+## Keys
+
+Mint keys in the app: **/admin → Ops keys**. Give the key a name, copy it once
+(it is shown exactly once), and paste it into the client config above. The list
+shows each key's prefix, when it was created and when it was last used, and a
+key can be revoked from there — no redeploy, no Supabase dashboard.
+
+Only a SHA-256 hash of the key is stored, so a leaked database backup yields no
+working credentials.
+
+There is also an optional `OPS_MCP_TOKEN` Supabase secret that is accepted as
+**break-glass** access, for when the database is unreachable or every key has
+been revoked by mistake. Leave it unset if you do not want it, and the minted
+keys are the only way in.
+
+With neither a valid minted key nor the break-glass secret, the endpoint returns
+401 — it fails closed on purpose.
+
 ## Setup
 
-1. Generate a token and store it as a Supabase secret named `OPS_MCP_TOKEN`
-   (e.g. `openssl rand -hex 32`). **Until this secret exists the endpoint
-   returns 401 to everyone** — it fails closed on purpose.
-2. Deploy the function (`supabase functions deploy ops-mcp`, or let Lovable
-   deploy it).
-3. The function also needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which
-   Supabase injects automatically.
+1. Run the migrations (`ops_tokens`, `generation_usage`).
+2. Deploy `ops-mcp` (`supabase functions deploy ops-mcp`, or let Lovable deploy
+   it), and redeploy `generate-diploma` so token accounting starts recording.
+3. Mint a key in /admin.
+
+The function also needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which
+Supabase injects automatically.
 
 `verify_jwt` is `false` for this function (see `supabase/config.toml`) because
 MCP clients present their own bearer token rather than a Supabase user JWT. That
-makes the `OPS_MCP_TOKEN` check the *only* gate — treat the token as a
-production credential and rotate it by updating the secret.
+makes the key check the *only* gate — treat keys as production credentials.
 
 ## Tools
 
