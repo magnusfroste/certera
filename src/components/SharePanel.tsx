@@ -82,13 +82,21 @@ export const SharePanel = () => {
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      const verificationUrl = currentDiplomaId 
+      const verificationUrl = currentDiplomaId
         ? `${window.location.origin}/verify/${currentDiplomaId}`
         : shareUrl;
-      
+
+      // The renderer caps portrait diplomas at 620px (landscape at 800px), so
+      // the stored CSS tells us the orientation. Size the capture box and the
+      // PDF page to match — otherwise a portrait diploma is squashed into a
+      // fixed 800×600 landscape frame.
+      const isPortrait = /\.diploma-container\s*\{[^}]*max-width:\s*620px/.test(diplomaCss || '');
+      const boxW = isPortrait ? 600 : 800;
+      const boxH = isPortrait ? 800 : 600;
+
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = `
-        <div style="width: 800px; height: 600px; padding: 20px; background: white; position: relative; overflow: hidden;">
+        <div style="width: ${boxW}px; height: ${boxH}px; padding: 20px; background: white; position: relative; overflow: hidden;">
           <style>
             ${diplomaCss}
             * { box-sizing: border-box !important; }
@@ -166,8 +174,8 @@ export const SharePanel = () => {
       }
 
       const canvas = await html2canvas(tempDiv.firstElementChild as HTMLElement, {
-        width: 800,
-        height: 600,
+        width: boxW,
+        height: boxH,
         scale: 2.5,
         useCORS: true,
         allowTaint: true,
@@ -181,12 +189,12 @@ export const SharePanel = () => {
         }
       });
 
-      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      const pdf = new jsPDF(isPortrait ? 'portrait' : 'landscape', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png', 0.95);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      const aspectRatio = 600 / 800;
+
+      const aspectRatio = boxH / boxW;
       let finalWidth = pdfWidth;
       let finalHeight = pdfWidth * aspectRatio;
       

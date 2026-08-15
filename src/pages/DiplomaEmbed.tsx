@@ -41,6 +41,12 @@ const DiplomaEmbed = () => {
     // regex-rewriting the HTML, which corrupted legitimate content containing "qr".
     const cleanedHTML = diplomaData.diploma_html;
 
+    // signed_diplomas has no orientation column, but the stored CSS carries it:
+    // the renderer caps portrait diplomas at 620px (landscape at 800px). Detect
+    // that so we can re-assert the portrait width below — otherwise the
+    // universal max-width:100% rule stretches portrait into a landscape shape.
+    const isPortrait = /\.diploma-container\s*\{[^}]*max-width:\s*620px/.test(diplomaData.diploma_css || '');
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -66,6 +72,16 @@ const DiplomaEmbed = () => {
             max-width: 100% !important;
             box-sizing: border-box !important;
           }
+          ${isPortrait ? `
+          /* Portrait diplomas render on a 620px canvas; re-assert that cap with
+             higher specificity so the universal rule above doesn't flatten them
+             into a landscape shape. Landscape is left untouched. */
+          .embed-wrapper > .diploma-container {
+            max-width: 620px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+          ` : ''}
           .embed-overlay {
             position: absolute;
             bottom: 8px;
