@@ -137,6 +137,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ops_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          last_used_at: string | null
+          prefix: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          last_used_at?: string | null
+          prefix: string
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          prefix?: string
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
