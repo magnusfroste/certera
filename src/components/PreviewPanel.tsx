@@ -35,7 +35,7 @@ const GuestSignShareCta = ({ action }: { action: 'sign' | 'share' }) => (
 );
 
 export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
-  const { diplomaHtml, diplomaCss, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
+  const { diplomaHtml, diplomaCss, diplomaFormat, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const [editableHtml, setEditableHtml] = useState(diplomaHtml || '');
@@ -170,6 +170,18 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
           .diploma-wrapper [style*="position:absolute"] {
             max-width: 95% !important;
           }
+          ${diplomaFormat === 'portrait' ? `
+          /* Portrait diplomas render on a narrow (620px) canvas. The universal
+             max-width:100% rule above would otherwise stretch the container to
+             the full panel width, flattening portrait into a landscape shape —
+             so re-assert the portrait cap with higher specificity. Landscape is
+             left untouched (it intentionally fills the panel). */
+          .diploma-wrapper > .diploma-container {
+            max-width: 620px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+          ` : ''}
           ${isEditMode ? `
           [contenteditable="true"] {
             outline: none;
