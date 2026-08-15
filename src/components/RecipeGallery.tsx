@@ -1,6 +1,17 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { renderDSL } from '@/diploma-dsl/render';
-import { DIPLOMA_RECIPES, type DiplomaRecipe } from '@/constants/diplomaRecipes';
+import { DIPLOMA_RECIPES, type DiplomaRecipe, type RecipeCategory } from '@/constants/diplomaRecipes';
+
+// Display order for the category filter (matches the recipe file grouping).
+const CATEGORY_ORDER: RecipeCategory[] = [
+  'Academic',
+  'Course',
+  'Professional',
+  'Award',
+  'School',
+  'Recognition',
+];
 
 // Logical canvas the diploma is rendered at before being scaled into the card.
 // Sized so the tallest recipe fits without clipping (measured across all
@@ -67,10 +78,71 @@ const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPi
   );
 };
 
-export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean }) => (
-  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-start">
-    {DIPLOMA_RECIPES.map((recipe) => (
-      <RecipeThumb key={recipe.id} recipe={recipe} onPick={onPick} disabled={disabled} />
-    ))}
-  </div>
-);
+export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean }) => {
+  // "all" = show every recipe; otherwise filter by category.
+  const [active, setActive] = useState<string>('all');
+
+  // Count per category, derived from the recipe list so it stays correct if
+  // recipes are added or removed.
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of DIPLOMA_RECIPES) map.set(r.category, (map.get(r.category) ?? 0) + 1);
+    return map;
+  }, []);
+
+  const visible = useMemo(
+    () => (active === 'all' ? DIPLOMA_RECIPES : DIPLOMA_RECIPES.filter((r) => r.category === active)),
+    [active],
+  );
+
+  const handleValueChange = (value: string) => {
+    // ToggleGroup type="single" emits "" when the active item is toggled off.
+    // Keep a filter always selected (fall back to "all") so the gallery is
+    // never emptied by accident.
+    setActive(value || 'all');
+  };
+
+  return (
+    <div className="space-y-3">
+      <ToggleGroup
+        type="single"
+        value={active}
+        onValueChange={handleValueChange}
+        aria-label="Filter templates by category"
+        variant="outline"
+        size="sm"
+        className="flex-wrap justify-start gap-1.5"
+      >
+        <ToggleGroupItem
+          value="all"
+          aria-label={`All templates, ${DIPLOMA_RECIPES.length} total`}
+          className="gap-1.5 rounded-full border-border px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:hover:bg-primary"
+        >
+          <span>All</span>
+          <span className="text-[10px] tabular-nums text-muted-foreground data-[state=on]:text-primary-foreground/80">{DIPLOMA_RECIPES.length}</span>
+        </ToggleGroupItem>
+        {CATEGORY_ORDER.map((cat) => (
+          <ToggleGroupItem
+            key={cat}
+            value={cat}
+            aria-label={`${cat} templates, ${counts.get(cat) ?? 0} total`}
+            className="gap-1.5 rounded-full border-border px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:hover:bg-primary"
+          >
+            <span>{cat}</span>
+            <span className="text-[10px] tabular-nums text-muted-foreground data-[state=on]:text-primary-foreground/80">{counts.get(cat) ?? 0}</span>
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
+      <div
+        className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-start min-h-[9rem]"
+        role="list"
+        aria-label={`${visible.length} template${visible.length === 1 ? '' : 's'}`}
+      >
+        {visible.map((recipe) => (
+          <RecipeThumb key={recipe.id} recipe={recipe} onPick={onPick} disabled={disabled} />
+        ))}
+      </div>
+    </div>
+  );
+};
