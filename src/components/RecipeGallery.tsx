@@ -13,6 +13,16 @@ const CATEGORY_ORDER: RecipeCategory[] = [
   'Recognition',
 ];
 
+const CHIP_CLASS =
+  'group gap-1.5 rounded-full border-border px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:hover:bg-primary';
+
+// Muted while the chip is off; takes the chip's own foreground once active (see
+// the note where these are used). No alpha on the active colour: at 10px an
+// 80%-opacity foreground measured 2.32:1 against the primary fill, worse than
+// the label beside it, for no visual gain.
+const COUNT_CLASS =
+  'text-[10px] tabular-nums text-muted-foreground group-data-[state=on]:text-primary-foreground';
+
 // Logical canvas the diploma is rendered at before being scaled into the card.
 // Sized so the tallest recipe fits without clipping (measured across all
 // recipes); portrait recipes render on a narrower canvas (the renderer caps
@@ -113,23 +123,27 @@ export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRe
         size="sm"
         className="flex-wrap justify-start gap-1.5"
       >
+        {/* `group` on the item is what lets the count span react to the item's
+            own data-state: the attribute lives on the button, so a bare
+            data-[state=on]: on the span would never match and the count would
+            stay muted grey on the active chip's primary fill. */}
         <ToggleGroupItem
           value="all"
           aria-label={`All templates, ${DIPLOMA_RECIPES.length} total`}
-          className="gap-1.5 rounded-full border-border px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:hover:bg-primary"
+          className={CHIP_CLASS}
         >
           <span>All</span>
-          <span className="text-[10px] tabular-nums text-muted-foreground data-[state=on]:text-primary-foreground/80">{DIPLOMA_RECIPES.length}</span>
+          <span className={COUNT_CLASS}>{DIPLOMA_RECIPES.length}</span>
         </ToggleGroupItem>
         {CATEGORY_ORDER.map((cat) => (
           <ToggleGroupItem
             key={cat}
             value={cat}
             aria-label={`${cat} templates, ${counts.get(cat) ?? 0} total`}
-            className="gap-1.5 rounded-full border-border px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:hover:bg-primary"
+            className={CHIP_CLASS}
           >
             <span>{cat}</span>
-            <span className="text-[10px] tabular-nums text-muted-foreground data-[state=on]:text-primary-foreground/80">{counts.get(cat) ?? 0}</span>
+            <span className={COUNT_CLASS}>{counts.get(cat) ?? 0}</span>
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
