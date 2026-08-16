@@ -1,3 +1,13 @@
+-- Per-generation token accounting.
+--
+-- The generate-diploma function called providers without recording anything, so
+-- there was no way to answer "how many tokens did we burn, on which model, and
+-- what did it cost?" — the provider responses carry a usage block that was
+-- simply discarded. This table captures it going forward.
+--
+-- One row per provider call, including calls that failed over: the fallback
+-- chain can burn tokens on a provider that then errors, and that spend is real.
+
 CREATE TABLE IF NOT EXISTS public.generation_usage (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at timestamptz NOT NULL DEFAULT now(),
