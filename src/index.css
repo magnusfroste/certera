@@ -17,7 +17,10 @@
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 93%;
 
-    --primary: 24 95% 53%;
+    /* Button/surface orange. Darkened from 53% so white label text reaches
+       WCAG AA (4.70:1 measured); at 53% it was 2.85:1. --ring stays at 53% because a
+       focus indicator only needs 3:1 and benefits from staying bright. */
+    --primary: 24 95% 39%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 14%;
@@ -40,7 +43,7 @@
 
     --sidebar-background: 0 0% 5%;
     --sidebar-foreground: 0 0% 75%;
-    --sidebar-primary: 24 95% 53%;
+    --sidebar-primary: 24 95% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 12%;
     --sidebar-accent-foreground: 0 0% 93%;
@@ -61,7 +64,10 @@
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 93%;
 
-    --primary: 24 95% 53%;
+    /* Button/surface orange. Darkened from 53% so white label text reaches
+       WCAG AA (4.70:1 measured); at 53% it was 2.85:1. --ring stays at 53% because a
+       focus indicator only needs 3:1 and benefits from staying bright. */
+    --primary: 24 95% 39%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 14%;
@@ -82,7 +88,7 @@
 
     --sidebar-background: 0 0% 5%;
     --sidebar-foreground: 0 0% 75%;
-    --sidebar-primary: 24 95% 53%;
+    --sidebar-primary: 24 95% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 12%;
     --sidebar-accent-foreground: 0 0% 93%;
