@@ -33,7 +33,7 @@ export interface DiplomaDSL {
   seal?: { style?: string; position?: string; text?: string };
   signature?: { style?: string; name?: string; title?: string };
   footer?: { additionalText?: string; verificationUrl?: string };
-  brand?: { primaryColor?: string; accentColor?: string };
+  brand?: { name?: string; primaryColor?: string; accentColor?: string };
   background?: { style?: string };
   customCss?: string;
 }

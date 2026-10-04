@@ -10,20 +10,20 @@ import { toast } from 'sonner';
 
 const BUCKET = 'branding-assets';
 
-interface BrandingSettings {
+type BrandingSettings = {
   appName: string;
   appDescription: string;
   logoUrl: string;
   faviconUrl: string;
-}
+};
 
-interface OgSettings {
+type OgSettings = {
   ogTitle: string;
   ogDescription: string;
   ogImage: string;
   twitterCard: string;
   twitterSite: string;
-}
+};
 
 const defaultBranding: BrandingSettings = {
   appName: 'certera.ink',
