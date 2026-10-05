@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { DiplomaFrame } from '@/components/DiplomaFrame';
 import { toast } from 'sonner';
+import { SITE_URL } from '@/lib/siteUrl';
 
 interface SealData {
   hederaTxId?: string;
@@ -92,7 +93,7 @@ const Diploma = () => {
     );
   }
 
-  const verificationUrl = `${window.location.origin}/verify/${diplomaData.blockchain_id}`;
+  const verificationUrl = `${SITE_URL}/verify/${diplomaData.blockchain_id}`;
   const seal = parseSeal(diplomaData.diplomator_seal);
 
   return (

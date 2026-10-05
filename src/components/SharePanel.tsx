@@ -19,6 +19,7 @@ import {
   LinkedinIcon,
   WhatsappIcon
 } from 'react-share';
+import { SITE_URL } from '@/lib/siteUrl';
 
 export const SharePanel = () => {
   const { diplomaHtml, diplomaCss } = useDiploma();
@@ -83,7 +84,7 @@ export const SharePanel = () => {
     setIsGeneratingPDF(true);
     try {
       const verificationUrl = currentDiplomaId
-        ? `${window.location.origin}/verify/${currentDiplomaId}`
+        ? `${SITE_URL}/verify/${currentDiplomaId}`
         : shareUrl;
 
       // The renderer caps portrait diplomas at 620px (landscape at 800px), so
@@ -327,7 +328,7 @@ export const SharePanel = () => {
             <div className="flex justify-center p-4 bg-white rounded-lg border">
               <div className="text-center">
                 <QRCodeGenerator 
-                  value={`${window.location.origin}/verify/${currentDiplomaId}`}
+                  value={`${SITE_URL}/verify/${currentDiplomaId}`}
                   size={100}
                 />
                 <p className="text-xs text-muted-foreground mt-2 font-mono">

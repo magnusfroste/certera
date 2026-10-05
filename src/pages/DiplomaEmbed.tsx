@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ExternalLink, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { SITE_URL } from '@/lib/siteUrl';
 
 const DiplomaEmbed = () => {
   const { diplomaId } = useParams();
@@ -151,7 +152,7 @@ const DiplomaEmbed = () => {
         <div class="embed-wrapper">
           ${cleanedHTML}
           <div class="embed-overlay">
-            <a href="${window.location.origin}/diploma/${diplomaData.blockchain_id}" target="_blank" class="embed-link">
+            <a href="${SITE_URL}/diploma/${diplomaData.blockchain_id}" target="_blank" class="embed-link">
               <svg class="shield-icon" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 1l9 4v6c0 5.55-3.84 10.74-9 12-5.16-1.26-9-6.45-9-12V5l9-4z"/>
               </svg>

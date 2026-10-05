@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { SITE_URL } from '@/lib/siteUrl';
 
 export interface DiplomaRecord {
   id: string;
@@ -52,10 +53,7 @@ export const generateDiplomaId = (): string => {
   return 'DIP_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 11);
 };
 
-const getCurrentBaseUrl = (): string => {
-  if (typeof window !== 'undefined') return window.location.origin;
-  return 'https://certera.ink';
-};
+const getCurrentBaseUrl = (): string => SITE_URL;
 
 /**
  * Signs a diploma to Hedera blockchain and stores in database
