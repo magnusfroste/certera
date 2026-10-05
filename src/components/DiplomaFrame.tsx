@@ -20,7 +20,10 @@ export const DiplomaFrame = ({ html, css, title = 'Diploma', className, minHeigh
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(minHeight);
 
-  const language = html.match(/<html[^>]*\blang=["']([^"']+)["']/i)?.[1] || 'sv-SE';
+  const parsedLanguage = html.match(/<html[^>]*\blang=["']([^"']+)["']/i)?.[1];
+  const language = parsedLanguage && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(parsedLanguage)
+    ? parsedLanguage
+    : 'sv-SE';
   const canvasWidth = /\.diploma-container\s*\{[^}]*max-width:\s*620px/i.test(css) ? 620 : 800;
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
   const fitCss = fitToWidth
