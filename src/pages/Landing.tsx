@@ -6,9 +6,9 @@ const Landing = () => {
   const navigate = useNavigate();
 
   const painPoints = [
-    { stat: "40%", label: "of resumes contain false credentials", source: "HireRight Report" },
-    { stat: "$600B", label: "lost annually to credential fraud worldwide", source: "World Economic Forum" },
-    { stat: "89%", label: "of employers want verifiable proof of skills", source: "LinkedIn Talent Survey" },
+    { stat: "Seconds", label: "to verify a diploma with a link or QR code" },
+    { stat: "0", label: "accounts needed to check a credential" },
+    { stat: "SHA-256", label: "fingerprint on every diploma, recorded on Hedera" },
   ];
 
   const features = [
@@ -58,7 +58,7 @@ const Landing = () => {
       <section className="max-w-3xl mx-auto text-center px-6 pt-24 pb-16">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card text-xs text-muted-foreground mb-6">
           <CheckCircle className="w-3 h-3 text-primary" />
-          Trusted by forward-thinking organizations
+          Blockchain-verified on Hedera Hashgraph
         </div>
         <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-tight mb-5">
           Issue diplomas your recipients — and their employers — can trust
