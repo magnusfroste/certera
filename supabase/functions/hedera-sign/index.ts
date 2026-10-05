@@ -119,6 +119,24 @@ serve(async (req) => {
 
     client.close();
 
+    const seal = {
+      hederaTxId: txId,
+      hederaTopicId: topicId,
+      hederaSequenceNumber: sequenceNumber,
+      hederaExplorerUrl: `https://hashscan.io/testnet/topic/${topicId}`,
+      hederaTxExplorerUrl: `https://hashscan.io/testnet/transaction/${txId}`,
+    };
+
+    // Record the signature server-side; signed_diplomas only accepts rows that match it
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { error: recordError } = await admin.from('hedera_signatures').insert({
+      diploma_id: diplomaId,
+      issuer_id: user.id,
+      content_hash: contentHash,
+      seal,
+    });
+    if (recordError) throw new Error('Failed to record signature: ' + recordError.message);
+
     return new Response(JSON.stringify({
       success: true,
       transactionId: txId,
