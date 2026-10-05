@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, QrCode, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
-import { Award, ExternalLink, Shield, Calendar, QrCode, Copy, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
@@ -17,14 +15,25 @@ interface SealData {
   hederaTxId?: string;
   hederaTopicId?: string;
   hederaSequenceNumber?: number;
+  hederaExplorerUrl?: string;
 }
 
 const parseSeal = (raw: string): SealData | null => {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(raw) as SealData; } catch { return null; }
+};
+
+const diplomaLocale = (html: string) => {
+  const language = html.match(/<html[^>]*\blang=["']([^"']+)["']/i)?.[1];
+  return language?.toLowerCase().startsWith('en') ? 'en-US' : language || 'sv-SE';
+};
+
+const formatDate = (value: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
+
+const getExplorerUrl = (seal: SealData | null) => {
+  if (seal?.hederaExplorerUrl) return seal.hederaExplorerUrl;
+  if (!seal?.hederaTxId) return null;
+  return `https://hashscan.io/testnet/transaction/${encodeURIComponent(seal.hederaTxId.replace('@', '-'))}`;
 };
 
 const Diploma = () => {
@@ -33,161 +42,127 @@ const Diploma = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [sealOpen, setSealOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    if (!diplomaId) return;
-    const fetchDiplomaData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('signed_diplomas')
-          .select('*')
-          .eq('blockchain_id', diplomaId)
-          .maybeSingle();
-
-        if (error) { setError(`Database error: ${error.message}`); return; }
-        if (!data) { setError('Diploma not found'); return; }
-        setDiplomaData(data);
-      } catch {
-        setError('Unexpected error occurred');
-      } finally {
-        setIsLoading(false);
-      }
+    if (!diplomaId) { setError('Diploma not found'); setIsLoading(false); return; }
+    const fetchDiploma = async () => {
+      const { data, error: queryError } = await supabase
+        .from('signed_diplomas')
+        .select('*')
+        .eq('blockchain_id', diplomaId)
+        .maybeSingle();
+      if (queryError) setError(`Database error: ${queryError.message}`);
+      else if (!data) setError('Diploma not found');
+      else setDiplomaData(data);
+      setIsLoading(false);
     };
-    fetchDiplomaData();
+    void fetchDiploma();
   }, [diplomaId]);
 
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
-      toast.success('Link copied!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy');
-    }
+      toast.success('Link copied');
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch { toast.error('Could not copy link'); }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Award className="w-8 h-8 text-primary animate-pulse mx-auto mb-3" />
-          <p className="text-muted-foreground">Loading diploma…</p>
-        </div>
-      </div>
-    );
-  }
+  const prepared = useMemo(() => {
+    if (!diplomaData) return null;
+    const seal = parseSeal(diplomaData.diplomator_seal);
+    return {
+      seal,
+      explorerUrl: getExplorerUrl(seal),
+      verificationUrl: `${SITE_URL}/verify/${diplomaData.blockchain_id}`,
+      date: formatDate(diplomaData.created_at, diplomaLocale(diplomaData.diploma_html)),
+    };
+  }, [diplomaData]);
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md">
-          <CardHeader className="text-center">
-            <Award className="w-8 h-8 text-destructive mx-auto mb-2" />
-            <CardTitle className="text-destructive">Diploma Not Found</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
+  if (isLoading) return (
+    <main className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="text-center"><Award className="w-8 h-8 text-primary animate-pulse mx-auto mb-3" /><p className="text-muted-foreground">Loading diploma…</p></div>
+    </main>
+  );
 
-  const verificationUrl = `${SITE_URL}/verify/${diplomaData.blockchain_id}`;
-  const seal = parseSeal(diplomaData.diplomator_seal);
+  if (error || !diplomaData || !prepared) return (
+    <main className="min-h-screen bg-muted flex items-center justify-center p-4 text-center">
+      <div><Award className="w-10 h-10 text-destructive mx-auto mb-3" /><h1 className="text-xl font-semibold">Diploma Not Found</h1><p className="text-muted-foreground mt-1">{error}</p></div>
+    </main>
+  );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-4 py-3">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-foreground">certera.ink</span>
-          </div>
-          <Badge variant="secondary">
-            <Shield className="w-3 h-3 mr-1" />
-            Blockchain Verified
-          </Badge>
+    <div className="min-h-screen bg-muted text-foreground">
+      <header className="border-b bg-background/95 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <Award className="h-5 w-5 text-primary" />
+          <Link to="/" className="font-semibold">certera.ink</Link>
         </div>
       </header>
 
-      {/* Diploma hero */}
-      <main className="flex-1 flex items-start justify-center p-4 md:p-8">
-        <div className="w-full max-w-5xl space-y-4">
-          <div className="bg-card rounded-lg shadow-lg border overflow-hidden">
-            <DiplomaFrame
-              html={diplomaData.diploma_html}
-              css={diplomaData.diploma_css}
-              title={`Diploma for ${diplomaData.recipient_name}`}
-            />
-          </div>
-
-          {/* Blockchain details collapsible */}
-          {seal && (
-            <Collapsible open={sealOpen} onOpenChange={setSealOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto">
-                  <Shield className="w-3 h-3" />
-                  Blockchain details
-                  <ChevronDown className={`w-3 h-3 transition-transform ${sealOpen ? 'rotate-180' : ''}`} />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 rounded-md border bg-muted/50 p-3 text-xs font-mono space-y-1 max-w-lg mx-auto">
-                  {seal.hederaTopicId && <p><span className="text-muted-foreground">Topic:</span> {seal.hederaTopicId}</p>}
-                  {seal.hederaTxId && <p><span className="text-muted-foreground">Tx:</span> {seal.hederaTxId}</p>}
-                  {seal.hederaSequenceNumber != null && <p><span className="text-muted-foreground">Seq:</span> {seal.hederaSequenceNumber}</p>}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+      <main className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto overflow-hidden shadow-lg">
+          <DiplomaFrame
+            html={diplomaData.diploma_html}
+            css={diplomaData.diploma_css}
+            title={`Diploma for ${diplomaData.recipient_name}`}
+            minHeight={180}
+            fitToWidth
+          />
         </div>
-      </main>
 
-      {/* Footer action bar */}
-      <footer className="border-t bg-background/95 backdrop-blur px-4 py-3">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>{diplomaData.recipient_name}</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{diplomaData.institution_name}</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {new Date(diplomaData.created_at).toLocaleDateString()}
-            </span>
+        <section aria-label="Diploma verification" className="mx-auto max-w-4xl py-5 sm:py-6">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-7 w-7 shrink-0 text-success" />
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold">Authentic diploma</h1>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                <span>{diplomaData.institution_name}</span><span aria-hidden="true">·</span>
+                <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{prepared.date}</span><span aria-hidden="true">·</span>
+                {prepared.explorerUrl ? (
+                  <a className="inline-flex items-center gap-1 text-foreground underline underline-offset-4 hover:text-primary" href={prepared.explorerUrl} target="_blank" rel="noreferrer">
+                    Registered on Hedera <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                ) : <span>Registered on Hedera</span>}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="mt-3 border-t pt-3">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground" aria-label="Show blockchain details">
+                <Shield className="h-4 w-4" /> Show details
+                <ChevronDown className={`h-4 w-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <dl className="mt-2 grid gap-2 rounded-md border bg-background p-3 text-xs sm:grid-cols-[7rem_1fr]">
+                <dt className="text-muted-foreground">Content hash</dt><dd className="break-all font-mono">{diplomaData.content_hash}</dd>
+                {prepared.seal?.hederaTxId && <><dt className="text-muted-foreground">Transaction</dt><dd className="break-all font-mono">{prepared.seal.hederaTxId}</dd></>}
+                {prepared.seal?.hederaTopicId && <><dt className="text-muted-foreground">Topic</dt><dd className="break-all font-mono">{prepared.seal.hederaTopicId}</dd></>}
+              </dl>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="mt-4 flex flex-wrap gap-2 border-t pt-4" aria-label="Diploma actions">
             <Button variant="outline" size="sm" onClick={copyLink}>
-              {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
-              {copied ? 'Copied' : 'Copy Link'}
+              {copied ? <Check /> : <Copy />}{copied ? 'Copied' : 'Copy link'}
             </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(verificationUrl, '_blank')}
-            >
-              <Shield className="w-3 h-3 mr-1" />
-              Verify
-            </Button>
-
+            <Button variant="outline" size="sm" asChild><Link to={`/verify/${diplomaData.blockchain_id}`}><Shield />Verify</Link></Button>
             <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <QrCode className="w-3 h-3" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-4" align="end">
-                <QRCodeGenerator value={verificationUrl} size={160} level="M" />
-                <p className="text-xs text-muted-foreground text-center mt-2">Scan to verify</p>
+              <PopoverTrigger asChild><Button variant="outline" size="sm" aria-label="Show verification QR code"><QrCode />QR</Button></PopoverTrigger>
+              <PopoverContent className="w-auto p-4" align="start">
+                <QRCodeGenerator value={prepared.verificationUrl} size={160} level="M" />
+                <p className="mt-2 text-center text-xs text-muted-foreground">Scan to verify</p>
               </PopoverContent>
             </Popover>
+            {diplomaData.diploma_url && (
+              <Button variant="outline" size="sm" asChild><a href={diplomaData.diploma_url} download><Download />Download</a></Button>
+            )}
           </div>
-        </div>
-      </footer>
+        </section>
+      </main>
     </div>
   );
 };

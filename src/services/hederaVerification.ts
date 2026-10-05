@@ -20,6 +20,8 @@ export interface VerifiedRecord {
   institution_name: string;
   content_hash: string;
   created_at: string;
+  diploma_html: string;
+  diploma_css: string;
 }
 
 export interface HcsRecord {
@@ -88,7 +90,7 @@ async function fetchHcsMessage(
   return { msg: JSON.parse(json) as OnChainMessage, consensusTimestamp: data.consensus_timestamp };
 }
 
-export async function verifyDiploma(diplomaId: string, recipientNameInput: string): Promise<VerifyResult> {
+export async function verifyDiploma(diplomaId: string, recipientNameInput?: string): Promise<VerifyResult> {
   const { data: row, error } = await supabase
     .from('signed_diplomas')
     .select('blockchain_id, recipient_name, institution_name, diploma_html, diploma_css, content_hash, diplomator_seal, created_at')
@@ -104,18 +106,23 @@ export async function verifyDiploma(diplomaId: string, recipientNameInput: strin
     institution_name: row.institution_name,
     content_hash: row.content_hash,
     created_at: row.created_at,
+    diploma_html: row.diploma_html,
+    diploma_css: row.diploma_css,
   };
 
   const checks: VerifyCheck[] = [];
 
-  // 1. Recipient the verifier typed matches the recorded recipient (tolerant).
-  const nameMatch = normalizeName(row.recipient_name) === normalizeName(recipientNameInput);
-  checks.push({
-    key: 'recipient',
-    label: 'Recipient name matches the record',
-    ok: nameMatch,
-    detail: nameMatch ? undefined : 'The name entered does not match this diploma.',
-  });
+  // Linked verification proves the record itself. Manual lookup additionally
+  // checks the recipient supplied by the verifier.
+  if (recipientNameInput?.trim()) {
+    const nameMatch = normalizeName(row.recipient_name) === normalizeName(recipientNameInput);
+    checks.push({
+      key: 'recipient',
+      label: 'Recipient name matches the record',
+      ok: nameMatch,
+      detail: nameMatch ? undefined : 'The name entered does not match this diploma.',
+    });
+  }
 
   // Recompute the content hash from the stored diploma.
   const recomputedContentHash = await sha256(row.diploma_html + row.diploma_css);
