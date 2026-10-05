@@ -1,0 +1,11 @@
+# certera.ink
+
+> AI diploma and certificate generator with tamper-proof verification on the Hedera blockchain.
+
+certera.ink lets schools, course providers and HR teams design branded, animated diplomas and certificates with an AI chat assistant that extracts branding from a website or document. Issued certificates can be verified by anyone through a blockchain-backed verification page.
+
+## Links
+
+- [Home](https://www.certera.ink/)
+- [Demo](https://www.certera.ink/demo)
+- [Verify a certificate](https://www.certera.ink/verify)
