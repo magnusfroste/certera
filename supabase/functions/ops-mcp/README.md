@@ -64,12 +64,44 @@ makes the key check the *only* gate — treat keys as production credentials.
 | `get_signins` | Daily active users by last sign-in, and how many never signed in. |
 | `get_diploma_volume` | Daily sessions created vs diplomas signed, plus top institutions. |
 | `list_recent_diplomas` | Most recently signed diplomas (recipient, institution, blockchain id). |
+| `get_traffic` | Page views and visitors per day, how many got past the landing page into the demo and sign-up, top pages, referrers, devices, countries. Crawlers excluded by default. See below. |
 | `get_guest_usage` | Guest rate-limit state: generations in the active 24h windows, IPs at the cap. |
 | `check_providers` | Live provider health — the credit alarm. See below. |
 | `get_settings` | Current `app_settings` key/value configuration. |
 | `get_token_usage` | Tokens and estimated cost per day and per provider/model, including spend wasted on failed calls and fallback. |
 | `list_models` | Providers and models the app can use, their estimated prices, which key is configured, and what is active now. |
 | `set_ai_provider` | **Write.** Switch the provider/model used for all generations. |
+
+## Traffic
+
+`get_traffic` reads `page_views`, written by the public `track` edge function
+from a beacon in the app (`src/components/PageTracker.tsx`). It exists because
+visitor numbers otherwise live only in Lovable's hosted analytics, which needs
+an interactive OAuth login and so cannot be read by an edge function — or by an
+agent that only holds an ops key.
+
+The measurement is first-party and cookieless:
+
+- **No IP address and no cookie is stored.** A visitor is a truncated
+  `sha256(daily_salt | ip | user_agent)`; the salt is random per UTC day and
+  deleted when the day ends, after which the hash cannot be recomputed. The
+  consequence is deliberate: visitors are only countable within one day, so
+  totals are *visitor-days*.
+- **Query strings and fragments are dropped**, and only the referrer's hostname
+  is kept — both can carry personal data.
+- **Crawlers are recorded but flagged** (`is_bot`) by user agent and excluded by
+  default; pass `include_bots: true` to count them.
+- **Only the live site is measured.** The beacon fires only on `certera.ink`
+  hosts and honours Do Not Track / Global Privacy Control, so previews, the
+  Lovable editor and local development never pollute the numbers. The `track`
+  function rejects any other `Origin` as a backstop.
+
+The `funnel` block is the part worth watching: of the visitor-days, how many
+went beyond the landing page, opened the demo, reached sign-up, or viewed or
+verified a diploma.
+
+Measurement starts when `track` is deployed; `measuringSince` says when. Older
+history exists only in Lovable analytics.
 
 ## What `check_providers` can and cannot tell you
 

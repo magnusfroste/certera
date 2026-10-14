@@ -194,6 +194,54 @@ export type Database = {
         }
         Relationships: []
       }
+      page_views: {
+        Row: {
+          country: string | null
+          created_at: string
+          device: string
+          id: string
+          is_bot: boolean
+          path: string
+          referrer_host: string | null
+          visitor_hash: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          device?: string
+          id?: string
+          is_bot?: boolean
+          path: string
+          referrer_host?: string | null
+          visitor_hash: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          device?: string
+          id?: string
+          is_bot?: boolean
+          path?: string
+          referrer_host?: string | null
+          visitor_hash?: string
+        }
+        Relationships: []
+      }
+      traffic_salts: {
+        Row: {
+          day: string
+          salt: string
+        }
+        Insert: {
+          day: string
+          salt: string
+        }
+        Update: {
+          day?: string
+          salt?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

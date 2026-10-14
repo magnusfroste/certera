@@ -2,6 +2,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { PageTracker } from "@/components/PageTracker";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -72,6 +73,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
+          <PageTracker />
           <ErrorBoundary>
             <Suspense fallback={<LoadingFallback />}>
               <Routes>

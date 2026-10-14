@@ -575,6 +575,101 @@ const TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  get_traffic: {
+    description:
+      'Site traffic from first-party, cookieless measurement: page views and visitors per day, how many got past the landing page and into the product, top pages, referrers, devices and countries. Crawlers are excluded by default and reported separately. Measurement starts when the track function was deployed — older history exists only in Lovable analytics.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Look-back window, 1-90 (default 7)' },
+        include_bots: { type: 'boolean', description: 'Count self-identified crawlers in the totals (default false)' },
+      },
+    },
+    handler: async (args) => {
+      const days = daysArg(args, 7);
+      const includeBots = Boolean(args.include_bots);
+
+      // PostgREST caps a response at 1000 rows, so page through; without this
+      // the tool would silently under-report as soon as traffic grew.
+      type View = { created_at: string; path: string; referrer_host: string | null; device: string; country: string | null; visitor_hash: string; is_bot: boolean };
+      const rows: View[] = [];
+      const pageSize = 1000;
+      for (let from = 0; from < 50_000; from += pageSize) {
+        const { data, error } = await admin()
+          .from('page_views')
+          .select('created_at, path, referrer_host, device, country, visitor_hash, is_bot')
+          .gte('created_at', sinceIso(days))
+          .order('created_at', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(`page_views: ${error.message}`);
+        rows.push(...((data ?? []) as View[]));
+        if (!data || data.length < pageSize) break;
+      }
+
+      const { data: first } = await admin()
+        .from('page_views').select('created_at').order('created_at', { ascending: true }).limit(1).maybeSingle();
+
+      const bots = rows.filter((r) => r.is_bot);
+      const counted = includeBots ? rows : rows.filter((r) => !r.is_bot);
+
+      // Visitor hashes use a salt that rotates daily, so a visitor is only
+      // identifiable within one UTC day — "visitors" are summed per day.
+      const byDay = new Map<string, { pageviews: number; visitors: Set<string> }>();
+      for (let i = days - 1; i >= 0; i--) {
+        byDay.set(new Date(Date.now() - i * DAY_MS).toISOString().slice(0, 10), { pageviews: 0, visitors: new Set() });
+      }
+      // Per visitor-day: which paths they reached, to see if anyone gets past
+      // the landing page.
+      const journeys = new Map<string, Set<string>>();
+      const tally = (m: Map<string, number>, k: string | null) => { if (k) m.set(k, (m.get(k) ?? 0) + 1); };
+      const paths = new Map<string, number>(), refs = new Map<string, number>();
+      const devices = new Map<string, number>(), countries = new Map<string, number>();
+
+      for (const r of counted) {
+        const day = r.created_at.slice(0, 10);
+        const d = byDay.get(day);
+        if (d) { d.pageviews++; d.visitors.add(r.visitor_hash); }
+        const key = `${day}|${r.visitor_hash}`;
+        if (!journeys.has(key)) journeys.set(key, new Set());
+        journeys.get(key)!.add(r.path);
+        tally(paths, r.path); tally(refs, r.referrer_host);
+        tally(devices, r.device); tally(countries, r.country);
+      }
+
+      const visitorDays = [...journeys.values()];
+      const reached = (re: RegExp) => visitorDays.filter((ps) => [...ps].some((p) => re.test(p))).length;
+      const top = (m: Map<string, number>, n = 10) =>
+        [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([key, count]) => ({ key, count }));
+
+      return {
+        days,
+        measuringSince: first?.created_at ?? null,
+        note: first
+          ? 'Visitors are counted per day: the anonymising salt rotates daily, so the same person on two days counts twice.'
+          : 'No page views recorded yet — the track function or the beacon may not be deployed. Earlier history lives in Lovable analytics.',
+        totals: {
+          pageviews: counted.length,
+          visitorDays: visitorDays.length,
+          botPageviews: bots.length,
+          botsIncluded: includeBots,
+        },
+        // The funnel this site lives or dies by: land -> try -> sign up.
+        funnel: {
+          visitorDays: visitorDays.length,
+          wentBeyondLanding: visitorDays.filter((ps) => [...ps].some((p) => p !== '/')).length,
+          openedDemoOrApp: reached(/^\/(demo|app)$/),
+          reachedSignUp: reached(/^\/auth$/),
+          viewedOrVerifiedDiploma: reached(/^\/(diploma|verify)\//),
+        },
+        byDay: [...byDay].map(([date, v]) => ({ date, pageviews: v.pageviews, visitors: v.visitors.size })),
+        topPaths: top(paths),
+        topReferrers: top(refs),
+        devices: top(devices),
+        countries: top(countries),
+      };
+    },
+  },
+
   check_providers: {
     description:
       'Live health of every AI provider and Firecrawl: reports ok / no_key / out_of_credits / rate_limited / auth_failed / error. Use this when generation fails or to check whether credits ran out. OpenRouter and Firecrawl report a real remaining balance; Anthropic and OpenAI only reveal exhausted credit through a real call, so use deep=true to detect that.',
