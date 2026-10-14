@@ -13,3 +13,8 @@ verify_jwt = false
 # so Supabase JWT verification is off — MCP clients send their own bearer token.
 [functions.ops-mcp]
 verify_jwt = false
+
+# Public page-view beacon: anonymous visitors send it with sendBeacon, which
+# cannot carry a JWT. It only inserts one validated row (see the function).
+[functions.track]
+verify_jwt = false
