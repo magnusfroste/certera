@@ -103,6 +103,17 @@ deployed edge function, so it works end-to-end from a dev server.
   `OPENAI_/GEMINI_/OPENROUTER_API_KEY`, `FIRECRAWL_API_KEY` (URL scraping),
   `HEDERA_ACCOUNT_ID` / `HEDERA_PRIVATE_KEY` / `HEDERA_TOPIC_ID`.
 
+## Dependencies
+
+- `package.json` `overrides` pin `dompurify`, `fflate`, `ws` and `lodash` to
+  patched releases (advisory fixes reached through transitive deps of jspdf,
+  @supabase/supabase-js and recharts). Don't lower them; bump to the newest
+  patched release instead. The security scanner reads `bun.lock`, so after any
+  dependency change run `bun install` (not only `npm install`) and re-check.
+- `jspdf` is kept on the latest major (4.x) — the PDF export in `SharePanel`
+  (`new jsPDF(...)` + `addImage` + `save`) was re-verified after each major
+  bump by driving the signed-in app and checking the downloaded file.
+
 ## Conventions
 
 - UI strings are English; keep dark-mode-safe colors (use theme tokens or
