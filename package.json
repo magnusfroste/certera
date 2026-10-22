@@ -93,6 +93,7 @@
     "vitest": "^3.2.7"
   },
   "overrides": {
-    "dompurify": "^3.4.17"
+    "dompurify": "^3.4.17",
+    "fflate": "^0.8.3"
   }
 }
