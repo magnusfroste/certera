@@ -18,6 +18,7 @@ npm run dev       # Vite dev server (config binds host "::" / port 8080;
                   # `npx vite --host 127.0.0.1 --port 5199 --strictPort`)
 npm run build     # typecheck edge functions + vite build
 npm run lint      # eslint — keep this at 0 errors
+npm run test      # vitest run — unit tests under src/**/__tests__/
 npm run preview   # preview a production build
 npm run typecheck:functions  # tsc over supabase/functions/ (also part of build)
 ```
@@ -28,9 +29,14 @@ production `ReferenceError`. `tsconfig.functions.json` + the
 `supabase/functions/deno-shim.d.ts` ambient shim (Deno global, `https:`/`npm:`
 imports) let plain `tsc` catch that class of bug pre-merge.
 
-There is **no test suite**. Verify changes by building, linting, and driving the
-running app (see "Verifying" below). Keep `npm run build` and `npm run lint`
-green before committing.
+There is a small unit-test suite: `npm run test` (vitest, files under
+`src/**/__tests__/*.test.ts`, config in `vitest.config.ts` — it only maps the
+`@/` alias so the app's dev-server plugins stay out of test runs). Vitest is
+pinned to v3 because vitest 5 requires vite 6 and this project is on vite 5.
+Add a focused test next to the existing ones when you change a rule the user
+cares about. Verify everything else by building, linting, and driving the
+running app (see "Verifying" below). Keep `npm run build`, `npm run lint` and
+`npm run test` green before committing.
 
 ## Architecture
 
@@ -80,7 +86,7 @@ Lovable is connected to GitHub. After a PR merges to `main`:
   migration + `supabase functions deploy`) before/with the frontend publish,
   since the client and backend must be compatible.
 
-## Verifying (no test suite)
+## Verifying the running app
 
 Drive the running app. Chromium is preinstalled at `/opt/pw-browsers/chromium`.
 The sandbox's egress proxy (`$HTTPS_PROXY`) must relay Supabase calls: launch
