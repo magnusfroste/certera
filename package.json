@@ -51,7 +51,7 @@
     "embla-carousel-react": "^8.3.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
-    "jspdf": "^3.0.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "qrcode.react": "^4.2.0",
@@ -61,7 +61,7 @@
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.53.0",
     "react-resizable-panels": "^2.1.3",
-    "react-router-dom": "^6.26.2",
+    "react-router-dom": "^6.30.6",
     "react-share": "^5.2.2",
     "recharts": "^2.12.7",
     "sonner": "^1.5.0",
@@ -93,6 +93,9 @@
     "vitest": "^3.2.7"
   },
   "overrides": {
-    "dompurify": "^3.4.16"
+    "dompurify": "^3.4.17",
+    "fflate": "^0.8.3",
+    "ws": "^8.22.0",
+    "lodash": "^4.18.1"
   }
 }
