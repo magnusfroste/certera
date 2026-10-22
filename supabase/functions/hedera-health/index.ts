@@ -18,7 +18,7 @@ serve(async (req) => {
   const t0 = Date.now();
   try {
     const { Client, TopicCreateTransaction, TopicMessageSubmitTransaction, PrivateKey } =
-      await import(`npm:@hashgraph/sdk@${SDK_VERSION}`);
+      await import("npm:@hashgraph/sdk@2.51.0"); // keep in sync with hedera-sign
     const accountId = Deno.env.get("HEDERA_ACCOUNT_ID");
     const rawKey = Deno.env.get("HEDERA_PRIVATE_KEY");
     steps.credentials = Boolean(accountId && rawKey);
