@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 const diplomaLocale = (html?: string) => {
   const language = html?.match(/<html[^>]*\blang=["']([^"']+)["']/i)?.[1];
-  return language?.toLowerCase().startsWith('en') ? 'en-US' : language || 'sv-SE';
+  return language?.toLowerCase().startsWith('en') ? 'en-GB' : language || 'en-GB';
 };
 
 const formatDate = (value: string, html?: string) =>

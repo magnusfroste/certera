@@ -23,7 +23,7 @@ export const DiplomaFrame = ({ html, css, title = 'Diploma', className, minHeigh
   const parsedLanguage = html.match(/<html[^>]*\blang=["']([^"']+)["']/i)?.[1];
   const language = parsedLanguage && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(parsedLanguage)
     ? parsedLanguage
-    : 'sv-SE';
+    : 'en-GB';
   const canvasWidth = /\.diploma-container\s*\{[^}]*max-width:\s*620px/i.test(css) ? 620 : 800;
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
   const fitCss = fitToWidth
