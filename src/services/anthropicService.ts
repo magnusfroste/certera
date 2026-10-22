@@ -33,35 +33,9 @@ export interface DiplomaGenerationResponse {
 export const generateDiploma = async (request: DiplomaGenerationRequest): Promise<DiplomaGenerationResponse> => {
   try {
     // Get user's full name from profiles table
-    let userFullName = request.userFullName;
-    if (!userFullName) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Fetch name from profiles table
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileData?.name) {
-          userFullName = profileData.name;
-        } else {
-          // Fallback to auth metadata if profile name doesn't exist
-          if (user.user_metadata?.name) {
-            userFullName = user.user_metadata.name;
-          } else if (user.user_metadata?.full_name) {
-            userFullName = user.user_metadata.full_name;
-          } else {
-            // Use email prefix as final fallback
-            userFullName = user.email?.split('@')[0] || 'Your Name';
-          }
-        }
-      } else {
-        // Guest / demo: a friendly placeholder reads better than "User"
-        userFullName = 'Your Name';
-      }
-    }
+    // No name: generate-diploma then keeps the {{recipient_name}} placeholder,
+    // which is replaced with the recipient's name when the diploma is signed.
+    const userFullName = request.userFullName ?? '';
 
     const response = await supabase.functions.invoke('generate-diploma', {
       body: {

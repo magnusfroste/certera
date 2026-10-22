@@ -20,9 +20,10 @@ import {
   WhatsappIcon
 } from 'react-share';
 import { SITE_URL } from '@/lib/siteUrl';
+import { personalizeHtml, previewHtml } from '@/lib/recipient';
 
 export const SharePanel = () => {
-  const { diplomaHtml, diplomaCss } = useDiploma();
+  const { diplomaHtml, diplomaCss, signingRecipientName } = useDiploma();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [copied, setCopied] = useState(false);
   const [diplomaUrl, setDiplomaUrl] = useState('');
@@ -42,7 +43,8 @@ export const SharePanel = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const contentHash = await createContentHash(diplomaHtml, diplomaCss);
+        const signedHtml = signingRecipientName.trim() ? personalizeHtml(diplomaHtml, signingRecipientName) : diplomaHtml;
+        const contentHash = await createContentHash(signedHtml, diplomaCss);
         const { data } = await supabase
           .from('signed_diplomas')
           .select('diploma_url, blockchain_id')
@@ -74,7 +76,7 @@ export const SharePanel = () => {
       cancelled = true;
       window.removeEventListener(DIPLOMA_SIGNED_EVENT, fetchSignedDiploma);
     };
-  }, [diplomaHtml, diplomaCss]);
+  }, [diplomaHtml, diplomaCss, signingRecipientName]);
 
   const shareUrl = diplomaUrl || window.location.href;
   const shareTitle = "Check out my diploma created with Diploma Generator!";
@@ -111,7 +113,7 @@ export const SharePanel = () => {
             .diploma-container [style*="position: absolute"],
             .diploma-container [style*="position:absolute"] { max-width: 90% !important; }
           </style>
-          <div class="diploma-container">${diplomaHtml}</div>
+          <div class="diploma-container">${previewHtml(diplomaHtml, signingRecipientName)}</div>
           
           <div style="position: absolute; top: 12px; right: 12px; background: rgba(37, 99, 235, 0.95); color: white; padding: 6px 12px; border-radius: 15px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; backdrop-filter: blur(4px);">
             <span style="font-size: 12px;">🛡️</span>

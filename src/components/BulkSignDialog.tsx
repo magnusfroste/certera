@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Users, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { signDiplomaToBlockchain } from '@/services/blockchainService';
 import { toast } from 'sonner';
+import { personalizeHtml } from '@/lib/recipient';
 
 interface BulkSignDialogProps {
   open: boolean;
@@ -71,10 +72,7 @@ export const BulkSignDialog = ({
 
       try {
         // Replace recipient name placeholder in HTML if present
-        const personalizedHtml = diplomaHtml.replace(
-          /\{\{recipient_name\}\}/gi,
-          name
-        );
+        const personalizedHtml = personalizeHtml(diplomaHtml, name);
 
         await signDiplomaToBlockchain(
           personalizedHtml,

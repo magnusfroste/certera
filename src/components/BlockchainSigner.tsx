@@ -8,6 +8,7 @@ import { useDiploma } from '@/contexts/DiplomaContext';
 import { signDiplomaToBlockchain, createDiplomaUrl, DiplomaRecord } from '@/services/blockchainService';
 import { toast } from 'sonner';
 import { BulkSignDialog } from '@/components/BulkSignDialog';
+import { personalizeHtml } from '@/lib/recipient';
 
 export const BlockchainSigner = () => {
   const { 
@@ -37,7 +38,7 @@ export const BlockchainSigner = () => {
     setIsSigningTx(true);
     try {
       const record = await signDiplomaToBlockchain(
-        diplomaHtml, diplomaCss,
+        personalizeHtml(diplomaHtml, signingRecipientName), diplomaCss,
         signingRecipientName.trim(), signingInstitutionName.trim()
       );
       setSignedRecord(record);

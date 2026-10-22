@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonacoEditor } from '@/components/MonacoEditor';
+import { previewHtml } from '@/lib/recipient';
 
 // Lazy-load heavy tab content (SharePanel pulls in jspdf + html2canvas)
 const SharePanel = lazy(() => import('@/components/SharePanel').then((m) => ({ default: m.SharePanel })));
@@ -35,7 +36,7 @@ const GuestSignShareCta = ({ action }: { action: 'sign' | 'share' }) => (
 );
 
 export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
-  const { diplomaHtml, diplomaCss, diplomaFormat, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
+  const { diplomaHtml, diplomaCss, diplomaFormat, signingRecipientName, setDiplomaHtml, setDiplomaCss, setDiplomaDsl, commitDesign, undoDesign, canUndo } = useDiploma();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const [editableHtml, setEditableHtml] = useState(diplomaHtml || '');
@@ -203,7 +204,7 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
       </head>
       <body>
         <div class="diploma-wrapper">
-          ${diplomaHtml}
+          ${isEditMode ? diplomaHtml : previewHtml(diplomaHtml, signingRecipientName)}
         </div>
         ${isEditMode ? `
         <script>
