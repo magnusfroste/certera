@@ -1,4 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { renderDSL } from '@/diploma-dsl/render';
 import { DIPLOMA_RECIPES, type DiplomaRecipe, type RecipeCategory } from '@/constants/diplomaRecipes';
@@ -32,10 +34,9 @@ const CANVAS = {
   portrait: { w: 660, h: 745 },
 };
 
-const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean }) => {
+const RecipePreview = ({ recipe, className }: { recipe: DiplomaRecipe; className?: string }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.3);
-
   const { w: baseW, h: baseH } = CANVAS[recipe.dsl.layout?.orientation === 'portrait' ? 'portrait' : 'landscape'];
 
   useLayoutEffect(() => {
@@ -58,39 +59,69 @@ const RecipeThumb = ({ recipe, onPick, disabled }: { recipe: DiplomaRecipe; onPi
   }, [recipe, baseW, baseH]);
 
   return (
-    <button
-      type="button"
-      onClick={() => onPick(recipe)}
-      disabled={disabled}
-      aria-label={`Start from the ${recipe.label} template`}
-      className="group flex flex-col gap-1.5 text-left disabled:opacity-50 disabled:pointer-events-none"
+    <div
+      ref={boxRef}
+      className={`relative overflow-hidden rounded-md border border-border bg-muted/30 transition-colors group-hover:border-primary/50 group-focus-visible:border-primary ${className ?? ''}`}
+      style={{ aspectRatio: `${baseW} / ${baseH}` }}
     >
-      <div
-        ref={boxRef}
-        className="relative w-full overflow-hidden rounded-lg border border-border bg-muted/30 shadow-sm transition-colors group-hover:border-primary/50 group-focus-visible:border-primary"
-        style={{ aspectRatio: `${baseW} / ${baseH}` }}
-      >
-        <div style={{ width: baseW, height: baseH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          <iframe
-            sandbox=""
-            srcDoc={srcDoc}
-            scrolling="no"
-            title={recipe.label}
-            style={{ width: baseW, height: baseH, border: 0, pointerEvents: 'none' }}
-          />
-        </div>
+      <div style={{ width: baseW, height: baseH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        <iframe
+          sandbox=""
+          srcDoc={srcDoc}
+          scrolling="no"
+          tabIndex={-1}
+          aria-hidden="true"
+          title={recipe.label}
+          style={{ width: baseW, height: baseH, border: 0, pointerEvents: 'none' }}
+        />
       </div>
-      <div className="flex items-baseline justify-between gap-1">
-        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors truncate">{recipe.label}</span>
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60 shrink-0">{recipe.category}</span>
-      </div>
-    </button>
+    </div>
   );
 };
+
+type PickProps = { recipe: DiplomaRecipe; onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean };
+
+const RecipeThumb = ({ recipe, onPick, disabled }: PickProps) => (
+  <button
+    type="button"
+    onClick={() => onPick(recipe)}
+    disabled={disabled}
+    aria-label={`Start from the ${recipe.label} template`}
+    className="group flex flex-col gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none"
+  >
+    <RecipePreview recipe={recipe} className="w-full shadow-sm" />
+    <div className="flex items-baseline justify-between gap-1">
+      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors truncate">{recipe.label}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60 shrink-0">{recipe.category}</span>
+    </div>
+  </button>
+);
+
+// Compact chip: small preview + name. Used in the featured quick-start row.
+const RecipeChip = ({ recipe, onPick, disabled }: PickProps) => (
+  <button
+    type="button"
+    onClick={() => onPick(recipe)}
+    disabled={disabled}
+    aria-label={`Start from the ${recipe.label} template`}
+    className="group flex shrink-0 snap-start items-center gap-2 rounded-xl border border-border bg-card py-1.5 pl-1.5 pr-3 text-left transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none"
+  >
+    <RecipePreview recipe={recipe} className="w-11 shrink-0" />
+    <span className="whitespace-nowrap text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">{recipe.label}</span>
+  </button>
+);
+
+// Featured quick-start templates (view-level curation; recipes themselves unchanged).
+const FEATURED_IDS = ['classic-university', 'course-completion', 'modern-tech', 'professional-cert', 'elegant-gold', 'star-student'];
 
 export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRecipe) => void; disabled?: boolean }) => {
   // "all" = show every recipe; otherwise filter by category.
   const [active, setActive] = useState<string>('all');
+  const [expanded, setExpanded] = useState(false);
+  const featured = useMemo(
+    () => FEATURED_IDS.map((id) => DIPLOMA_RECIPES.find((r) => r.id === id)).filter((r): r is DiplomaRecipe => !!r),
+    [],
+  );
 
   // Count per category, derived from the recipe list so it stays correct if
   // recipes are added or removed.
@@ -114,6 +145,32 @@ export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRe
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">Or start from a template</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 px-2 text-xs text-primary hover:text-primary"
+          aria-expanded={expanded}
+          aria-controls="all-templates"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Hide templates' : `Show all templates (${DIPLOMA_RECIPES.length})`}
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+
+      {!expanded && (
+        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0" role="list" aria-label="Popular templates">
+          {featured.map((recipe) => (
+            <RecipeChip key={recipe.id} recipe={recipe} onPick={onPick} disabled={disabled} />
+          ))}
+        </div>
+      )}
+
+      {expanded && (
+      <div id="all-templates" className="space-y-3">
       <ToggleGroup
         type="single"
         value={active}
@@ -157,6 +214,8 @@ export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRe
           <RecipeThumb key={recipe.id} recipe={recipe} onPick={onPick} disabled={disabled} />
         ))}
       </div>
+      </div>
+      )}
     </div>
   );
 };
