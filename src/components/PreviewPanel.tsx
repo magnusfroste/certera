@@ -248,8 +248,8 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <Tabs defaultValue="preview" className="h-full flex flex-col">
+    <div className="h-full min-h-0 min-w-0 flex flex-col">
+      <Tabs defaultValue="preview" className="h-full min-h-0 flex flex-col">
         {/* Compact single-row header */}
         <div className="px-2 sm:px-3 py-2 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between gap-2 flex-wrap">
           <TabsList className="h-8 bg-secondary flex-wrap h-auto min-w-0">
@@ -308,14 +308,14 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-background flex flex-col">
-          <TabsContent value="preview" className="flex-1 p-3 m-0">
+        <div className="flex-1 min-h-0 bg-background flex flex-col overflow-y-auto">
+          <TabsContent value="preview" className="flex-1 min-h-0 p-3 m-0">
             {isEditMode && (
               <div className="mb-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg text-xs text-foreground">
                 ✏️ Click any text to edit it. Changes save automatically.
               </div>
             )}
-            <div className="h-full rounded-xl border border-border overflow-hidden shadow-lg shadow-black/20">
+            <div className="h-full rounded-lg border border-border overflow-hidden">
               <iframe
                 ref={iframeRef}
                 sandbox="allow-scripts"
@@ -396,7 +396,7 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
             </div>
           </TabsContent>
 
-          <TabsContent value="sign" className="flex-1 p-3 m-0">
+          <TabsContent value="sign" className="flex-1 p-4 sm:p-6 m-0">
             <div className="max-w-md mx-auto">
               {isGuest ? (
                 <GuestSignShareCta action="sign" />
@@ -408,7 +408,7 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
             </div>
           </TabsContent>
 
-          <TabsContent value="share" className="flex-1 p-3 m-0">
+          <TabsContent value="share" className="flex-1 p-4 sm:p-6 m-0">
             <div className="max-w-md mx-auto">
               {isGuest ? (
                 <GuestSignShareCta action="share" />

@@ -33,7 +33,6 @@ const BG_REPRESENTATIVE: Record<string, string> = {
   'botanical-green': '#e8f2e2', 'vintage-sepia': '#eeddc3', 'watercolor-soft': '#f0e8f0',
   'royal-burgundy': '#f2d8d8',
 };
-const DARK_BGS = new Set(['cosmic-dark']);
 
 function relativeLuminance(hex: string): number | null {
   const m = hex.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/);
@@ -59,27 +58,11 @@ function contrastRatio(a: string, b: string): number | null {
 // unreadable or mismatched designs, keep the curated palette instead.
 function applyDeterministicFixes(dsl: DiplomaDSL): void {
   const palette = PALETTES[dsl.palette ?? ''] || PALETTES['ivory-navy'];
-  const isLightText = palette.text === 'light';
-
-  // A background override whose darkness doesn't match the palette's text
-  // color would make body text unreadable — drop the override.
-  if (dsl.background?.style && DARK_BGS.has(dsl.background.style) !== isLightText) {
-    console.warn(`Dropping background override '${dsl.background.style}' (mismatches '${dsl.palette}' text color)`);
-    delete dsl.background;
-  }
-
+  // Foreground AA enforcement lives in the shared renderer. Never drop a
+  // selected background to compensate for unreadable text.
   const bgKey = dsl.background?.style || palette.bg;
   const bgColor = BG_REPRESENTATIVE[bgKey] || '#ffffff';
 
-  // Brand primary is used for headings/recipient: needs real contrast (WCAG
-  // large-text threshold). Brand accent is decorative: a lower bar.
-  if (dsl.brand?.primaryColor) {
-    const ratio = contrastRatio(dsl.brand.primaryColor, bgColor);
-    if (ratio !== null && ratio < 3) {
-      console.warn(`Dropping brand.primaryColor ${dsl.brand.primaryColor} (contrast ${ratio.toFixed(2)}:1 on ${bgKey})`);
-      delete dsl.brand.primaryColor;
-    }
-  }
   if (dsl.brand?.accentColor) {
     const ratio = contrastRatio(dsl.brand.accentColor, bgColor);
     if (ratio !== null && ratio < 1.6) {

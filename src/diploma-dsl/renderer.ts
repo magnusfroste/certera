@@ -2,6 +2,7 @@
 // Converts a DiplomaDSL object into final HTML and CSS strings
 
 import type { DiplomaDSL } from './types';
+import { backgroundSamples, ensureTextContrast } from '../../supabase/functions/_shared/diplomaContrast';
 import {
   backgroundStyles,
   borderStyles,
@@ -45,6 +46,11 @@ export function renderDiplomaDSL(dsl: DiplomaDSL): { html: string; css: string }
 
   // Background
   const bgCss = backgroundStyles[dsl.background.style] || backgroundStyles['clean-white'];
+  const samples = backgroundSamples(bgCss);
+  const readablePrimary = ensureTextContrast(primaryColor, samples);
+  for (const key of Object.keys(txt) as (keyof typeof txt)[]) {
+    txt[key] = ensureTextContrast(txt[key], samples);
+  }
   cssParts.push(`
     .diploma-container {
       max-width: 800px;
@@ -184,7 +190,9 @@ export function renderDiplomaDSL(dsl: DiplomaDSL): { html: string; css: string }
   `);
 
   // Custom CSS
-  if (dsl.customCss) cssParts.push(dsl.customCss);
+  // Styling cannot replace the curated background or bypass foreground AA.
+  if (dsl.customCss) cssParts.push(dsl.customCss.replace(/(?:^|[;{])\s*(?:color|background(?:-color)?|opacity)\s*:[^;}]+/gi, match => match.startsWith('{') ? '{' : ';'));
+  cssParts.push(`.diploma-container .diploma-body .diploma-title,.diploma-container .diploma-body .diploma-recipient,.diploma-container .diploma-body .diploma-course{color:${readablePrimary} !important}.diploma-container .diploma-body,.diploma-container .diploma-body *{opacity:1 !important;background:transparent !important;text-shadow:none !important}`);
 
   // Google Fonts import
   cssParts.unshift(`@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap');`);

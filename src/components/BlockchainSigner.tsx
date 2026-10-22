@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, CheckCircle, ExternalLink, Loader2, Users } from 'lucide-react';
 import { useDiploma } from '@/contexts/DiplomaContext';
-import { signDiplomaToBlockchain, createDiplomaUrl, DiplomaRecord } from '@/services/blockchainService';
+import { signDiplomaToBlockchain, DiplomaRecord } from '@/services/blockchainService';
 import { toast } from 'sonner';
 import { BulkSignDialog } from '@/components/BulkSignDialog';
 import { personalizeHtml } from '@/lib/recipient';
+import { useSignedDiploma } from '@/hooks/useSignedDiploma';
+
+const SharePanel = lazy(() => import('@/components/SharePanel').then(m => ({ default: m.SharePanel }))); 
 
 export const BlockchainSigner = () => {
   const { 
@@ -22,7 +24,6 @@ export const BlockchainSigner = () => {
   
   const [isSigningTx, setIsSigningTx] = useState(false);
   const [signedRecord, setSignedRecord] = useState<DiplomaRecord | null>(null);
-  const [diplomaUrl, setDiplomaUrl] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const handleSignToBlockchain = async () => {
@@ -42,7 +43,6 @@ export const BlockchainSigner = () => {
         signingRecipientName.trim(), signingInstitutionName.trim()
       );
       setSignedRecord(record);
-      setDiplomaUrl(createDiplomaUrl(record.id));
       toast.success('Diploma signed on Hedera blockchain!');
     } catch (error) {
       console.error('Signing error:', error);
@@ -53,30 +53,26 @@ export const BlockchainSigner = () => {
   };
 
   const hasContent = diplomaHtml && diplomaCss;
+  const existingSigned = useSignedDiploma();
 
   return (
-    <Card className="border-border bg-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Shield className="w-5 h-5 text-primary" />
-          Hedera Blockchain Verification
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Sign your diploma to Hedera Consensus Service for tamper-proof on-chain verification
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!signedRecord ? (
+    <section aria-label="Sign diploma" className="space-y-6">
+      <div><h2 className="text-lg font-semibold">{signedRecord || existingSigned ? 'Your diploma is ready to share' : 'Make it official'}</h2>
+        <p className="text-sm text-muted-foreground mt-1">{signedRecord || existingSigned ? 'Send the recipient a link to their verified achievement.' : 'Personalize your diploma, then record its authenticity on Hedera.'}</p>
+      </div>
+      <div className="space-y-4">
+        {!signedRecord && !existingSigned ? (
           <>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="recipient">Recipient Name</Label>
+                <Label htmlFor="recipient">Recipient name</Label>
                 <Input id="recipient" value={signingRecipientName}
                   onChange={(e) => setSigningRecipientName(e.target.value)}
-                  placeholder="Enter recipient's full name" disabled={isSigningTx} />
+                  placeholder="Enter recipient's full name" disabled={isSigningTx} aria-describedby="recipient-help" />
+                <p id="recipient-help" className="text-xs text-muted-foreground leading-relaxed">This name will be written onto the diploma when you sign. Your preview updates as you type.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="institution">Institution Name</Label>
+                <Label htmlFor="institution">Institution name</Label>
                 <Input id="institution" value={signingInstitutionName}
                   onChange={(e) => setSigningInstitutionName(e.target.value)}
                   placeholder="Enter institution name" disabled={isSigningTx} />
@@ -89,7 +85,7 @@ export const BlockchainSigner = () => {
               {isSigningTx ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing on Hedera...</>
               ) : (
-                <><Shield className="w-4 h-4 mr-2" />Sign on Hedera Blockchain</>
+                <><Shield className="w-4 h-4 mr-2" />Sign on Hedera</>
               )}
             </Button>
 
@@ -97,7 +93,7 @@ export const BlockchainSigner = () => {
               disabled={!hasContent || isSigningTx || !signingInstitutionName.trim()}
               className="w-full">
               <Users className="w-4 h-4 mr-2" />
-              Bulk Sign for Multiple Recipients
+              Sign for multiple recipients
             </Button>
 
             <BulkSignDialog
@@ -117,68 +113,19 @@ export const BlockchainSigner = () => {
             )}
           </>
         ) : (
-          <div className="space-y-4">
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-primary" />
-                <h4 className="font-medium text-foreground">Signed on Hedera!</h4>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Your diploma is now immutably recorded on Hedera Consensus Service.
-              </p>
+          <div className="space-y-5">
+            <div role="status" className="flex gap-3 border-b border-border pb-5">
+              <CheckCircle className="size-6 text-success shrink-0" />
+              <div><h3 className="font-medium">Authentic diploma</h3><p className="text-sm text-muted-foreground mt-1">Registered on Hedera. Ready to share and verify.</p></div>
             </div>
-
-            <div className="space-y-3">
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">DIPLOMA ID</Label>
-                <div className="text-sm bg-muted px-3 py-2 rounded font-mono mt-1 text-foreground">
-                  {signedRecord.id}
-                </div>
-              </div>
-
-              {signedRecord.hederaTxId && (
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground">HEDERA TX ID</Label>
-                  <div className="text-sm bg-muted px-3 py-2 rounded font-mono mt-1 text-foreground break-all">
-                    {signedRecord.hederaTxId}
-                  </div>
-                </div>
-              )}
-
-              {signedRecord.hederaTopicId && (
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground">HCS TOPIC</Label>
-                  <div className="text-sm bg-muted px-3 py-2 rounded font-mono mt-1 text-foreground">
-                    {signedRecord.hederaTopicId} (seq #{signedRecord.hederaSequenceNumber})
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">TIMESTAMP</Label>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {new Date(signedRecord.timestamp).toLocaleString()}
-                </div>
-              </div>
-
-              {signedRecord.hederaExplorerUrl && (
-                <Button variant="outline" className="w-full"
-                  onClick={() => window.open(signedRecord.hederaExplorerUrl, '_blank')}>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View on HashScan Explorer
-                </Button>
-              )}
-
-              <Button variant="outline" className="w-full"
-                onClick={() => window.open(diplomaUrl, '_blank')}>
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View Signed Diploma
-              </Button>
-            </div>
-
+            <Suspense fallback={<Loader2 className="size-5 animate-spin text-muted-foreground" />}><SharePanel compact /></Suspense>
+            {signedRecord && <details className="text-xs text-muted-foreground border-t border-border pt-4">
+              <summary className="cursor-pointer focus-visible:outline-ring">Registration details</summary>
+              <dl className="space-y-2 mt-3 break-all"><dt>Diploma ID</dt><dd className="font-mono">{signedRecord.id}</dd><dt>Signed</dt><dd>{new Date(signedRecord.timestamp).toLocaleString('en-GB')}</dd></dl>
+              {signedRecord.hederaExplorerUrl && <Button size="sm" variant="ghost" asChild><a href={signedRecord.hederaExplorerUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-3 mr-2" />View on HashScan</a></Button>}
+            </details>}
             <Button variant="ghost" className="w-full" onClick={() => {
               setSignedRecord(null);
-              setDiplomaUrl('');
               setSigningRecipientName('');
               setSigningInstitutionName('');
             }}>
@@ -186,7 +133,7 @@ export const BlockchainSigner = () => {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 };

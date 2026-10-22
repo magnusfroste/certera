@@ -1,195 +1,84 @@
 import { Button } from "@/components/ui/button";
-import { Award, ArrowRight, Shield, Zap, Globe, CheckCircle, Building2, FileCheck, Lock, BarChart3, BadgeCheck, Clock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Award, ArrowRight, CheckCircle2, PenLine, ShieldCheck, Share2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { DiplomaFrame } from "@/components/DiplomaFrame";
+import { DIPLOMA_RECIPES } from "@/constants/diplomaRecipes";
+import { renderDSL } from "@/diploma-dsl/render";
 
-const Landing = () => {
-  const navigate = useNavigate();
+const recipe = DIPLOMA_RECIPES.find((item) => item.id === 'classic-university');
+const sample = recipe ? renderDSL(recipe.dsl) : null;
+const steps = [
+  { icon: PenLine, title: 'Design', description: 'Start with a template. Make it your own.' },
+  { icon: ShieldCheck, title: 'Sign on Hedera', description: 'A permanent record of your diploma’s authenticity.' },
+  { icon: Share2, title: 'Share & verify', description: 'One link. Anyone can check it. No account needed.' },
+];
 
-  const painPoints = [
-    { stat: "Seconds", label: "to verify a diploma with a link or QR code" },
-    { stat: "0", label: "accounts needed to check a credential" },
-    { stat: "SHA-256", label: "fingerprint on every diploma, recorded on Hedera" },
-  ];
-
-  const features = [
-    { icon: Shield, title: "Immutable Blockchain Records", desc: "Every diploma is hashed and stored on Hedera Hashgraph — tamper-proof and publicly verifiable." },
-    { icon: Zap, title: "Issue in Minutes, Not Weeks", desc: "AI-assisted design and one-click signing. No complex setup, no vendor lock-in." },
-    { icon: Globe, title: "Instant Global Verification", desc: "Anyone can verify a credential with a link or QR code — no account needed." },
-    { icon: Lock, title: "Cryptographic Proof", desc: "SHA-256 content hashing ensures document integrity. Any alteration is immediately detectable." },
-    { icon: BarChart3, title: "Verification Analytics", desc: "Track how often credentials are verified and by whom — measure your program's reach." },
-    { icon: FileCheck, title: "Embeddable & Shareable", desc: "Recipients embed verified diplomas on websites, LinkedIn, or portfolios with one click." },
-  ];
-
-  const competitors = [
-    { name: "Credly", weakness: "Badge-only, no full diplomas. $3K+/year. Owned by Pearson." },
-    { name: "Accredible", weakness: "No blockchain verification. Complex pricing tiers. Slow setup." },
-    { name: "Certifier", weakness: "No on-chain proof. Limited customization. Per-credential fees." },
-  ];
-
-  const useCases = [
-    { icon: Building2, title: "Training Companies", desc: "Issue verifiable certificates for professional development programs." },
-    { icon: BadgeCheck, title: "Bootcamps & Academies", desc: "Give graduates credentials employers can trust instantly." },
-    { icon: Clock, title: "Corporate L&D", desc: "Certify internal training completions with auditable blockchain records." },
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="border-b border-border">
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-primary/15 border border-primary/20 p-1.5 rounded-lg">
-              <Award className="w-5 h-5 text-primary" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight text-foreground">certera.ink</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/demo')}>
-              Try Demo
-            </Button>
-            <Button size="sm" onClick={() => navigate('/auth')}>
-              Start Issuing
-            </Button>
-          </div>
+const Landing = () => (
+  <div className="min-h-screen bg-background text-foreground">
+    <nav aria-label="Main navigation" className="border-b border-border">
+      <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-8 py-4">
+        <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
+          <Award className="size-5 text-primary" />certera.ink
+        </Link>
+        <div className="flex items-center gap-1 sm:gap-3">
+          <Button variant="ghost" size="sm" asChild><Link to="/verify">Verify</Link></Button>
+          <Button variant="outline" size="sm" asChild><Link to="/auth">Sign in</Link></Button>
         </div>
-      </nav>
-
-      {/* Hero — B2B pitch */}
-      <section className="max-w-3xl mx-auto text-center px-6 pt-24 pb-16">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card text-xs text-muted-foreground mb-6">
-          <CheckCircle className="w-3 h-3 text-primary" />
-          Blockchain-verified on Hedera Hashgraph
-        </div>
-        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-tight mb-5">
-          Issue diplomas your recipients — and their employers — can trust
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8 leading-relaxed">
-          Blockchain-verified credentials that prove authenticity in seconds. No middlemen, no annual contracts, no per-seat pricing.
+      </div>
+    </nav>
+    <main>
+      <section className="px-4 sm:px-8 pt-10 sm:pt-14 pb-8 text-center">
+        <p className="text-xs font-mono text-muted-foreground mb-4">DESIGNED BY YOU. VERIFIED ON HEDERA.</p>
+        <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">Diplomas that earn trust.</h1>
+        <p className="max-w-lg mx-auto mt-4 text-sm sm:text-base text-muted-foreground leading-relaxed">
+          Create a beautiful diploma with your AI diploma agent.<br className="hidden sm:block" /> Sign it on Hedera. Share proof that lasts.
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button size="lg" onClick={() => navigate('/auth')}>
-            Start Issuing Free <ArrowRight className="ml-2 w-4 h-4" />
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => navigate('/demo')}>
-            See It in Action
-          </Button>
+        <div className="flex justify-center flex-wrap gap-3 mt-6 mb-8 sm:mb-10">
+          <Button asChild><Link to="/demo">Design a diploma <ArrowRight className="size-4 ml-2" /></Link></Button>
+          <Button variant="outline" asChild><Link to="/auth">Start issuing</Link></Button>
         </div>
-      </section>
-
-      {/* Pain points */}
-      <section className="border-y border-border bg-card/50">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border py-8 px-6">
-          {painPoints.map((p) => (
-            <div key={p.stat} className="text-center py-4 md:py-0">
-              <p className="text-2xl font-semibold text-foreground">{p.stat}</p>
-              <p className="text-xs text-muted-foreground mt-1">{p.label}</p>
+        {sample && (
+          <figure className="max-w-[800px] mx-auto text-left">
+            <div className="landing-document overflow-hidden rounded-sm">
+              <DiplomaFrame html={sample.html} css={sample.css} title="Sample diploma — Ashford University" minHeight={0} fitToWidth />
             </div>
+            <figcaption className="flex flex-wrap justify-between items-center gap-3 mt-4 text-xs sm:text-sm">
+              <div className="flex items-center gap-2"><CheckCircle2 className="size-5 text-success shrink-0" /><span className="font-medium">Authentic diploma<span className="block text-xs text-muted-foreground font-normal">Registered on Hedera when signed</span></span></div>
+              <span className="text-xs text-muted-foreground">Sample · Classic University</span>
+            </figcaption>
+          </figure>
+        )}
+      </section>
+      <section aria-label="Design, sign and share" className="border-y border-border bg-card/50">
+        <ol className="max-w-5xl mx-auto grid sm:grid-cols-3 gap-7 sm:gap-8 px-6 sm:px-8 py-10 sm:py-12">
+          {steps.map((step, index) => (
+            <li key={step.title} className="flex gap-4">
+              <step.icon className="size-5 text-primary mt-1 shrink-0" />
+              <div><h2 className="text-sm font-semibold"><span className="text-muted-foreground font-mono mr-2">0{index + 1}</span>{step.title}</h2><p className="mt-2 text-sm text-muted-foreground leading-relaxed">{step.description}</p></div>
+            </li>
           ))}
+        </ol>
+      </section>
+      <section className="max-w-5xl mx-auto px-6 sm:px-8 py-14 sm:py-20 grid md:grid-cols-2 gap-8 md:gap-16">
+        <div><p className="text-xs font-mono text-muted-foreground mb-3">A CREDENTIAL. NOT JUST A FILE.</p><h2 className="text-2xl font-semibold leading-snug">Celebrate achievement.<br />Make authenticity clear.</h2></div>
+        <div className="space-y-6 text-sm">
+          <div><h3 className="font-medium mb-2">For academies, teams and training providers</h3><p className="text-muted-foreground leading-relaxed">From course completions to academic awards, start with a curated design and refine it through conversation.</p></div>
+          <div><h3 className="font-medium mb-2">Proof anyone can check</h3><p className="text-muted-foreground leading-relaxed">Each signed diploma has a SHA-256 fingerprint recorded on Hedera, with a public verification link and QR code.</p></div>
+          <Button variant="outline" asChild><Link to="/demo">Try the studio <ArrowRight className="size-4 ml-2" /></Link></Button>
         </div>
       </section>
-
-      {/* Use cases */}
-      <section className="max-w-4xl mx-auto px-6 py-20">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground text-center mb-3">
-          Built for organizations that certify
-        </h2>
-        <p className="text-sm text-muted-foreground text-center mb-12 max-w-lg mx-auto">
-          Whether you run a bootcamp, corporate training, or professional academy — your credentials deserve blockchain-grade trust.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {useCases.map((u) => (
-            <div key={u.title} className="p-5 rounded-xl border border-border bg-card text-center">
-              <u.icon className="w-6 h-6 text-primary mx-auto mb-3" />
-              <h3 className="text-sm font-medium text-foreground mb-1.5">{u.title}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{u.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="border-y border-border bg-card/30">
-        <div className="max-w-4xl mx-auto px-6 py-20">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground text-center mb-12">
-            Why organizations choose certera.ink
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => (
-              <div key={f.title} className="group p-5 rounded-xl border border-border bg-background hover:border-primary/30 transition-colors">
-                <f.icon className="w-5 h-5 text-primary mb-3" />
-                <h3 className="text-sm font-medium text-foreground mb-1.5">{f.title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Competitor comparison */}
-      <section className="max-w-4xl mx-auto px-6 py-20">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground text-center mb-3">
-          How we compare
-        </h2>
-        <p className="text-sm text-muted-foreground text-center mb-10 max-w-lg mx-auto">
-          Legacy credential platforms charge thousands per year and still can't prove document integrity on-chain.
-        </p>
-        <div className="overflow-hidden rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-card border-b border-border">
-                <th className="text-left p-4 font-medium text-foreground">Platform</th>
-                <th className="text-left p-4 font-medium text-foreground">Blockchain Proof</th>
-                <th className="text-left p-4 font-medium text-foreground hidden md:table-cell">Limitation</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-border bg-primary/5">
-                <td className="p-4 font-medium text-foreground flex items-center gap-2">
-                  <Award className="w-4 h-4 text-primary" />
-                  certera.ink
-                </td>
-                <td className="p-4">
-                  <span className="inline-flex items-center gap-1 text-primary text-xs font-medium">
-                    <CheckCircle className="w-3 h-3" /> Hedera Hashgraph
-                  </span>
-                </td>
-                <td className="p-4 text-muted-foreground hidden md:table-cell">Open, transparent, no vendor lock-in</td>
-              </tr>
-              {competitors.map((c) => (
-                <tr key={c.name} className="border-b border-border last:border-b-0">
-                  <td className="p-4 text-foreground">{c.name}</td>
-                  <td className="p-4 text-xs text-muted-foreground">None</td>
-                  <td className="p-4 text-xs text-muted-foreground hidden md:table-cell">{c.weakness}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="border-t border-border bg-card/30">
-        <div className="max-w-3xl mx-auto text-center px-6 py-20">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-4">
-            Ready to issue credentials that speak for themselves?
-          </h2>
-          <p className="text-muted-foreground mb-8">
-            Create your first blockchain-verified diploma in under 5 minutes. No credit card required.
-          </p>
-          <Button size="lg" onClick={() => navigate('/auth')}>
-            Start Issuing Free <ArrowRight className="ml-2 w-4 h-4" />
-          </Button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-6 text-center">
-        <p className="text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} certera.ink. Blockchain-verified credentials for the modern world.
-        </p>
-      </footer>
-    </div>
-  );
-};
+    </main>
+    <footer className="border-t border-border">
+      <div className="max-w-6xl mx-auto px-6 sm:px-8 py-7 flex flex-col sm:flex-row justify-between gap-5 text-xs text-muted-foreground">
+        <p>© {new Date().getFullYear()} certera.ink</p>
+        <nav aria-label="Footer navigation" className="flex flex-wrap gap-5">
+          <Link className="hover:text-foreground focus-visible:outline-ring" to="/verify">Verify a diploma</Link>
+          <Link className="hover:text-foreground focus-visible:outline-ring" to="/demo">Demo</Link>
+          <Link className="hover:text-foreground focus-visible:outline-ring" to="/auth">Sign in</Link>
+        </nav>
+      </div>
+    </footer>
+  </div>
+);
 
 export default Landing;

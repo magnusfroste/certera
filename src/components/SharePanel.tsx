@@ -1,85 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Share2, Copy, Check, QrCode, Loader2 } from 'lucide-react';
+import { Download, Copy, Check, QrCode, Loader2, Mail, Linkedin, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { useDiploma } from '@/contexts/DiplomaContext';
-import { supabase } from '@/integrations/supabase/client';
-import { createContentHash, DIPLOMA_SIGNED_EVENT } from '@/services/blockchainService';
+import { useSignedDiploma } from '@/hooks/useSignedDiploma';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
-import {
-  FacebookShareButton,
-  TwitterShareButton,
-  LinkedinShareButton,
-  WhatsappShareButton,
-  FacebookIcon,
-  TwitterIcon,
-  LinkedinIcon,
-  WhatsappIcon
-} from 'react-share';
 import { SITE_URL } from '@/lib/siteUrl';
-import { personalizeHtml, previewHtml } from '@/lib/recipient';
+import { previewHtml } from '@/lib/recipient';
 
-export const SharePanel = () => {
+export const SharePanel = ({ compact = false }: { compact?: boolean }) => {
   const { diplomaHtml, diplomaCss, signingRecipientName } = useDiploma();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [diplomaUrl, setDiplomaUrl] = useState('');
-  const [currentDiplomaId, setCurrentDiplomaId] = useState('');
   const [showQR, setShowQR] = useState(false);
-  const [isSignedDiploma, setIsSignedDiploma] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Look up the signed record matching the diploma that is on screen
-    // (by content hash) — not just the user's most recently signed diploma.
-    const fetchSignedDiploma = async () => {
-      try {
-        if (!diplomaHtml && !diplomaCss) return;
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const signedHtml = signingRecipientName.trim() ? personalizeHtml(diplomaHtml, signingRecipientName) : diplomaHtml;
-        const contentHash = await createContentHash(signedHtml, diplomaCss);
-        const { data } = await supabase
-          .from('signed_diplomas')
-          .select('diploma_url, blockchain_id')
-          .eq('issuer_id', user.id)
-          .eq('content_hash', contentHash)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (cancelled) return;
-        if (data?.diploma_url) {
-          setDiplomaUrl(data.diploma_url);
-          setCurrentDiplomaId(data.blockchain_id);
-          setIsSignedDiploma(true);
-        } else {
-          setDiplomaUrl(window.location.href);
-          setCurrentDiplomaId('');
-          setIsSignedDiploma(false);
-        }
-      } catch (error) {
-        console.error('Error fetching diploma URL:', error);
-      }
-    };
-
-    fetchSignedDiploma();
-    // Refresh when the user signs the current diploma
-    window.addEventListener(DIPLOMA_SIGNED_EVENT, fetchSignedDiploma);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(DIPLOMA_SIGNED_EVENT, fetchSignedDiploma);
-    };
-  }, [diplomaHtml, diplomaCss, signingRecipientName]);
-
-  const shareUrl = diplomaUrl || window.location.href;
-  const shareTitle = "Check out my diploma created with Diploma Generator!";
+  const signed = useSignedDiploma();
+  const currentDiplomaId = signed?.id || '';
+  const isSignedDiploma = !!signed;
+  const shareUrl = signed?.url || window.location.href;
+  const shareTitle = 'My verified diploma on certera.ink';
   const hasContent = diplomaHtml || diplomaCss;
 
   const generatePDF = async () => {
@@ -233,150 +173,23 @@ export const SharePanel = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Share2 className="w-5 h-5" />
-          Share & Export
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Download your diploma or share it with others
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Status Info */}
-        {hasContent && !isSignedDiploma && (
-          <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-            <p className="text-sm text-foreground">
-              💡 Sign your diploma to the blockchain first to get a shareable link and QR code
-            </p>
-          </div>
-        )}
-
-        {isSignedDiploma && currentDiplomaId && (
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
-              ✅ This is a verified blockchain diploma with QR verification
-            </p>
-          </div>
-        )}
-
-        {/* Export Section */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Export</h4>
-          <Button
-            onClick={generatePDF}
-            disabled={!hasContent || isGeneratingPDF}
-            className="w-full"
-            variant="outline"
-          >
-            {isGeneratingPDF ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" />
-                Download as PDF
-              </>
-            )}
-          </Button>
-          {hasContent && (
-            <p className="text-xs text-muted-foreground">
-              PDF includes verification badge{currentDiplomaId ? ' and QR code' : ''}
-            </p>
-          )}
+    <section aria-label="Share diploma" className="space-y-5">
+      {!compact && <div><h2 className="text-lg font-semibold">Share your achievement</h2><p className="text-sm text-muted-foreground mt-1">A diploma. A link. Proof anyone can check.</p></div>}
+      {hasContent && !isSignedDiploma && <p className="text-sm text-muted-foreground border-l-2 border-primary pl-3">Sign your diploma to get its public link and QR code.</p>}
+      {!compact && isSignedDiploma && <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="size-4 text-success" />Authentic diploma · Registered on Hedera</p>}
+      {isSignedDiploma && currentDiplomaId && <>
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={copyToClipboard} className="min-h-11">{copied ? <Check className="size-4 mr-2" /> : <Copy className="size-4 mr-2" />}{copied ? 'Copied!' : 'Copy link'}</Button>
+          <Button variant="outline" className="min-h-11" onClick={() => setShowQR(!showQR)} aria-expanded={showQR}><QrCode className="size-4 mr-2" />QR code</Button>
+          <Button variant="outline" className="min-h-11" onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener,noreferrer')}><Linkedin className="size-4 mr-2" />LinkedIn</Button>
+          <Button variant="outline" className="min-h-11" asChild><a href={`mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodeURIComponent(shareUrl)}`}><Mail className="size-4 mr-2" />Email</a></Button>
         </div>
-
-        {/* Share Link + Social — only meaningful once a real diploma URL exists.
-            Before signing, shareUrl is just the app URL, which shows recipients nothing. */}
-        {isSignedDiploma && currentDiplomaId && (
-        <>
-        {/* Share Link Section */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Share Link</h4>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={copyToClipboard}
-              className="flex-1"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy Link
-                </>
-              )}
-            </Button>
-            
-            {isSignedDiploma && currentDiplomaId && (
-              <Button
-                variant="outline"
-                onClick={() => setShowQR(!showQR)}
-                size="icon"
-              >
-                <QrCode className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-
-          {showQR && currentDiplomaId && (
-            <div className="flex justify-center p-4 bg-white rounded-lg border">
-              <div className="text-center">
-                <QRCodeGenerator 
-                  value={`${SITE_URL}/verify/${currentDiplomaId}`}
-                  size={100}
-                />
-                <p className="text-xs text-muted-foreground mt-2 font-mono">
-                  {currentDiplomaId}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Social Media Section */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Social Media</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <FacebookShareButton url={shareUrl} hashtag="#diploma">
-              <div className="flex items-center gap-2 p-2 rounded border hover:bg-muted transition-colors w-full justify-center">
-                <FacebookIcon size={16} round />
-                <span className="text-sm">Facebook</span>
-              </div>
-            </FacebookShareButton>
-
-            <TwitterShareButton url={shareUrl} title={shareTitle}>
-              <div className="flex items-center gap-2 p-2 rounded border hover:bg-muted transition-colors w-full justify-center">
-                <TwitterIcon size={16} round />
-                <span className="text-sm">Twitter</span>
-              </div>
-            </TwitterShareButton>
-
-            <LinkedinShareButton url={shareUrl} title={shareTitle}>
-              <div className="flex items-center gap-2 p-2 rounded border hover:bg-muted transition-colors w-full justify-center">
-                <LinkedinIcon size={16} round />
-                <span className="text-sm">LinkedIn</span>
-              </div>
-            </LinkedinShareButton>
-
-            <WhatsappShareButton url={shareUrl} title={shareTitle}>
-              <div className="flex items-center gap-2 p-2 rounded border hover:bg-muted transition-colors w-full justify-center">
-                <WhatsappIcon size={16} round />
-                <span className="text-sm">WhatsApp</span>
-              </div>
-            </WhatsappShareButton>
-          </div>
-        </div>
-        </>
-        )}
-      </CardContent>
-    </Card>
+        {showQR && <div className="flex flex-col items-center gap-3 py-4 border-y border-border"><QRCodeGenerator value={`${SITE_URL}/verify/${currentDiplomaId}`} size={140} /><p className="text-xs font-mono text-muted-foreground break-all text-center">{currentDiplomaId}</p></div>}
+      </>}
+      <Button onClick={generatePDF} disabled={!hasContent || isGeneratingPDF} variant="outline" className="w-full min-h-11">
+        {isGeneratingPDF ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Download className="size-4 mr-2" />}{isGeneratingPDF ? 'Generating PDF...' : 'Download as PDF'}
+      </Button>
+      {signed && <Button variant="ghost" className="w-full" asChild><a href={signed.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-4 mr-2" />View signed diploma</a></Button>}
+    </section>
   );
 };
