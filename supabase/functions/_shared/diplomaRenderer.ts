@@ -3,6 +3,7 @@
 // (Vite) so a template preview, a template pick, and any later AI edit all
 // render through the exact same code — no font/style shift between them.
 // Pure TypeScript: no Deno or browser APIs, relative imports only.
+import { backgroundSamples, ensureTextContrast } from './diplomaContrast.ts';
 
 // Escape user/model-provided strings before interpolating into diploma HTML.
 export function esc(value: unknown): string {
@@ -229,8 +230,8 @@ function getSignatureHtmlCss(style: string, rawName: string, rawTitle: string | 
 // 6. customCss SANITIZER (whitelist properties)
 // ─────────────────────────────────────────────────────────────────
 const ALLOWED_PROPS = new Set([
-  'color','background','background-color','letter-spacing','font-weight','font-style',
-  'font-size','text-transform','opacity','margin','margin-top','margin-bottom',
+  'letter-spacing','font-weight','font-style',
+  'font-size','text-transform','margin','margin-top','margin-bottom',
   'padding','padding-top','padding-bottom','line-height','text-align','border-color',
 ]);
 function sanitizeCustomCss(css: string): string {
@@ -261,12 +262,14 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   const palette = PALETTES[paletteId] || PALETTES['ivory-navy'];
   // Colors are interpolated into CSS — only accept hex values
   const safeColor = (c: unknown, fallback: string): string =>
-    typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : fallback;
+    typeof c === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c) ? c : fallback;
   const pc = safeColor(dsl.brand?.primaryColor, palette.primary);
   const ac = safeColor(dsl.brand?.accentColor, palette.accent);
   const bgKey = dsl.background?.style || palette.bg;
   const bgCss = BG_STYLES[bgKey] || BG_STYLES['clean-white'];
-  const isLight = palette.text === 'light';
+  const samples = backgroundSamples(bgCss);
+  const textPrimary = ensureTextContrast(pc, samples);
+  const isLight = textPrimary === '#ffffff' || ensureTextContrast('#cccccc', samples) === '#cccccc';
 
   // Typography
   const typId = dsl.typography?.pair || 'serif-classic';
@@ -306,9 +309,14 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   const decoClasses = decos.map(d => DECO_CLASSES[d]).filter(Boolean).join(' ');
 
   // Text colors (adaptive)
-  const t = isLight
+  const preferredText = isLight
     ? { body:'#ddd', sec:'#ccc', ter:'#aaa', mut:'#999', fnt:'#888' }
     : { body:'#333', sec:'#555', ter:'#666', mut:'#888', fnt:'#aaa' };
+  const t = {
+    body: ensureTextContrast(preferredText.body, samples), sec: ensureTextContrast(preferredText.sec, samples),
+    ter: ensureTextContrast(preferredText.ter, samples), mut: ensureTextContrast(preferredText.mut, samples),
+    fnt: ensureTextContrast(preferredText.fnt, samples),
+  };
 
   // Portrait diplomas get a narrower canvas so they are actually taller than
   // wide once text wraps (orientation was previously display-only).
@@ -344,6 +352,14 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   const cleanCustom = sanitizeCustomCss(dsl.customCss || '');
   if (cleanCustom) cssParts.push(cleanCustom);
 
+  // Last in the cascade: model styling cannot undo the text contrast safety.
+  // Primary remains unchanged for decorative borders, banners and ornaments.
+  cssParts.push(`.diploma-container .diploma-body .diploma-title,.diploma-container .diploma-body .diploma-recipient,.diploma-container .diploma-body .diploma-course{color:${textPrimary} !important}.diploma-container .diploma-body,.diploma-container .diploma-body *{opacity:1 !important;background:transparent !important;text-shadow:none !important}.diploma-container .diploma-header .institution{color:${textPrimary}}.diploma-container .diploma-header .subtitle{color:${t.ter}}`);
+  if (composition === 'banner-top') {
+    const bannerText = ensureTextContrast('#ffffff', backgroundSamples(`background:${pc}`));
+    cssParts.push(`.diploma-container.comp-banner .diploma-header .institution,.diploma-container.comp-banner .diploma-header .subtitle{color:${bannerText} !important;opacity:1}`);
+  }
+
   // Build HTML (all model/user-provided text is escaped)
   const hasSeal = !!seal.html && dsl.seal?.style !== 'none';
   const fields = (dsl.body?.additionalFields||[]).map(f=>`<div><span class="field-label">${esc(f.label)}:</span> ${esc(f.value)}</div>`).join('');
@@ -352,7 +368,7 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
   const headerHtml = `<div class="diploma-header"><div class="institution">${esc(dsl.header?.institutionName||'Institution')}</div>${dsl.header?.subtitle?`<div class="subtitle">${esc(dsl.header.subtitle)}</div>`:''}</div>`;
   const bodyHtml = `<div class="diploma-body"><div class="diploma-title">${esc(dsl.body?.title||'Certificate')}</div>${dsl.body?.preText?`<div class="diploma-pretext">${esc(dsl.body.preText)}</div>`:''}<div class="diploma-recipient">${esc(dsl.body?.recipientName||'Recipient Name')}</div><div class="diploma-description">${esc(dsl.body?.description||'')}</div>${dsl.body?.courseOrProgram?`<div class="diploma-course">${esc(dsl.body.courseOrProgram)}</div>`:''}${fields?`<div class="diploma-fields">${fields}</div>`:''}${dsl.body?.date?`<div class="diploma-date">${esc(dsl.body.date)}</div>`:''}</div>`;
   const bottomHtml = `<div class="diploma-bottom-row${hasSeal?'':' no-seal'}">${sig.html}${hasSeal?`<div class="diploma-seal-wrapper">${seal.html}</div>`:''}</div>`;
-  const verifyHref = /^https?:\/\//i.test(dsl.footer?.verificationUrl ?? '') ? esc(dsl.footer!.verificationUrl) : '';
+  const verifyHref = /^https?:\/\//i.test(dsl.footer?.verificationUrl ?? '') ? esc(dsl.footer?.verificationUrl) : '';
   const footerHtml = dsl.footer?`<div class="diploma-footer">${dsl.footer.additionalText?`<div>${esc(dsl.footer.additionalText)}</div>`:''}${verifyHref?`<div><a href="${verifyHref}">Verify</a></div>`:''}</div>`:'';
 
   const inner = composition === 'split-horizontal'
