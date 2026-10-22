@@ -47,6 +47,14 @@ const LoadingFallback = () => (
 
 const App = () => {
   useEffect(() => {
+    // Keep brand fonts in the document head, not a remote CSS import.
+    if (!document.querySelector('link[data-brand-fonts]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+      link.dataset.brandFonts = 'true';
+      document.head.appendChild(link);
+    }
     // App mounted successfully → chunks loaded; clear the one-shot reload guard
     // so a future genuine chunk failure is allowed to reload once again.
     sessionStorage.removeItem("chunk-reload-attempted");

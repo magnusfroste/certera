@@ -15,18 +15,23 @@ import { useGuestAccess } from "@/hooks/useGuestAccess";
 import { GuestBanner } from "@/components/GuestBanner";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { StudioProgress } from "@/components/StudioProgress";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
 
 const IndexContent = ({ user, isGuest, guestAccess }: {
   user: User | null;
   isGuest: boolean;
   guestAccess: ReturnType<typeof useGuestAccess>;
 }) => {
-  const { messages, diplomaHtml, isGenerating } = useDiploma();
+  const { messages, diplomaHtml } = useDiploma();
   const hasStarted = messages.some(m => m.isUser);
   const hasCanvas = !!diplomaHtml;
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState('diploma');
 
   return (
-    <div className="h-screen flex w-full">
+    <div className="h-[100dvh] flex w-full">
       {!isGuest && (
         <AppSidebar
           userEmail={user?.email || ''}
@@ -41,15 +46,16 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
         {(isGuest || hasCanvas) && (
           <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 flex-wrap">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isGuest && (
                   <>
                     <div className="bg-primary/15 border border-primary/20 p-1.5 rounded-lg">
                       <Award className="w-5 h-5 text-primary" />
                     </div>
-                    <h1 className="text-lg font-semibold tracking-tight text-foreground">certera.ink</h1>
+                    <h1 className="text-lg font-semibold text-foreground">certera.ink</h1>
                   </>
                 )}
+                {hasCanvas && <StudioProgress />}
               </div>
               <div className="flex items-center gap-3">
                 {!isGuest && hasCanvas && <BlockchainMenu />}
@@ -77,7 +83,16 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
             </div>
           ) : (
             /* State 3: Split view - chat + canvas artifact */
-            <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+            isMobile ? (
+              <div className="h-full flex flex-col min-h-0">
+                <div className="flex border-b border-border px-3 py-1 gap-2" aria-label="Studio view">
+                  <Button size="sm" variant={mobileView === 'chat' ? 'secondary' : 'ghost'} onClick={() => setMobileView('chat')} aria-pressed={mobileView === 'chat'}>Chat</Button>
+                  <Button size="sm" variant={mobileView === 'diploma' ? 'secondary' : 'ghost'} onClick={() => setMobileView('diploma')} aria-pressed={mobileView === 'diploma'}>Diploma</Button>
+                </div>
+                <div className="flex-1 min-h-0" hidden={mobileView !== 'chat'}><ChatPanel isGuest={isGuest} guestAccess={isGuest ? guestAccess : undefined} /></div>
+                <div className="flex-1 min-h-0" hidden={mobileView !== 'diploma'}><PreviewPanel isGuest={isGuest} /></div>
+              </div>
+            ) : <ResizablePanelGroup direction="horizontal" className="w-full h-full">
               <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
                 <div className="h-full border-r border-border bg-background">
                   <ChatPanel isGuest={isGuest} guestAccess={isGuest ? guestAccess : undefined} />
