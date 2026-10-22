@@ -18,3 +18,6 @@ verify_jwt = false
 # cannot carry a JWT. It only inserts one validated row (see the function).
 [functions.track]
 verify_jwt = false
+
+[functions.hedera-health]
+verify_jwt = false
