@@ -161,6 +161,24 @@ export type Database = {
         }
         Relationships: []
       }
+      internal_secrets: {
+        Row: {
+          created_at: string
+          name: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          value?: string
+        }
+        Relationships: []
+      }
       ops_tokens: {
         Row: {
           created_at: string
@@ -351,6 +369,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_valid_internal_secret: {
+        Args: { p_name: string; p_secret: string }
         Returns: boolean
       }
     }
