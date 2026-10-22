@@ -162,7 +162,7 @@ export const RecipeGallery = ({ onPick, disabled }: { onPick: (recipe: DiplomaRe
       </div>
 
       {!expanded && (
-        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0" role="list" aria-label="Popular templates">
+        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0" role="list" aria-label="Popular templates">
           {featured.map((recipe) => (
             <RecipeChip key={recipe.id} recipe={recipe} onPick={onPick} disabled={disabled} />
           ))}
