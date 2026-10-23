@@ -20,6 +20,7 @@ export function hederaConfig() {
 }
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parsePrivateKey(PrivateKey: any, raw: string) {
   try { return PrivateKey.fromStringDer(raw); } catch { /* try next format */ }
   try { return PrivateKey.fromStringED25519(raw); } catch { /* try next format */ }
