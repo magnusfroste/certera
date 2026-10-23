@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hederaConfig, parsePrivateKey } from "../_shared/hedera.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Hedera Testnet REST API
-const HEDERA_TESTNET_API = 'https://testnet.mirrornode.hedera.com/api/v1';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,8 +31,9 @@ serve(async (req) => {
       });
     }
 
-    const HEDERA_ACCOUNT_ID = Deno.env.get('HEDERA_ACCOUNT_ID');
-    const HEDERA_PRIVATE_KEY = Deno.env.get('HEDERA_PRIVATE_KEY');
+    const hedera = hederaConfig();
+    const HEDERA_ACCOUNT_ID = hedera.accountId;
+    const HEDERA_PRIVATE_KEY = hedera.privateKey;
 
     if (!HEDERA_ACCOUNT_ID || !HEDERA_PRIVATE_KEY) {
       throw new Error('Hedera credentials not configured');
@@ -64,29 +64,15 @@ serve(async (req) => {
     const { Client, TopicMessageSubmitTransaction, TopicCreateTransaction, TopicId, PrivateKey } = 
       await import("npm:@hashgraph/sdk@2.51.0");
 
-    const client = Client.forTestnet();
+    const client = hedera.network === 'mainnet' ? Client.forMainnet() : Client.forTestnet();
     
-    // Try parsing the private key in multiple formats
-    let privateKey;
-    try {
-      privateKey = PrivateKey.fromStringDer(HEDERA_PRIVATE_KEY);
-    } catch {
-      try {
-        privateKey = PrivateKey.fromStringED25519(HEDERA_PRIVATE_KEY);
-      } catch {
-        try {
-          privateKey = PrivateKey.fromStringECDSA(HEDERA_PRIVATE_KEY);
-        } catch {
-          throw new Error('Could not parse private key. Ensure it is a valid HEX or DER-encoded Hedera private key.');
-        }
-      }
-    }
-    
+    const privateKey = parsePrivateKey(PrivateKey, HEDERA_PRIVATE_KEY);
+
     client.setOperator(HEDERA_ACCOUNT_ID, privateKey);
 
     // Use a shared topic - stored as env var or create one
     let topicId: string;
-    const HEDERA_TOPIC_ID = Deno.env.get('HEDERA_TOPIC_ID');
+    const HEDERA_TOPIC_ID = hedera.topicId;
     
     if (HEDERA_TOPIC_ID) {
       topicId = HEDERA_TOPIC_ID;
@@ -123,8 +109,8 @@ serve(async (req) => {
       hederaTxId: txId,
       hederaTopicId: topicId,
       hederaSequenceNumber: sequenceNumber,
-      hederaExplorerUrl: `https://hashscan.io/testnet/topic/${topicId}`,
-      hederaTxExplorerUrl: `https://hashscan.io/testnet/transaction/${txId}`,
+      hederaExplorerUrl: `${hedera.explorerBase}/topic/${topicId}`,
+      hederaTxExplorerUrl: `${hedera.explorerBase}/transaction/${txId}`,
     };
 
     // Record the signature server-side; signed_diplomas only accepts rows that match it
@@ -143,8 +129,8 @@ serve(async (req) => {
       topicId,
       sequenceNumber,
       consensusTimestamp: new Date().toISOString(),
-      explorerUrl: `https://hashscan.io/testnet/topic/${topicId}`,
-      txExplorerUrl: `https://hashscan.io/testnet/transaction/${txId}`,
+      explorerUrl: `${hedera.explorerBase}/topic/${topicId}`,
+      txExplorerUrl: `${hedera.explorerBase}/transaction/${txId}`,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -1,8 +1,9 @@
 // Health check for the Hedera signing path. Performs the same steps as
 // hedera-sign (same SDK version, operator key, topic create + message submit)
-// on testnet and reports timings. Protected by a secret in internal_secrets.
+// on the configured network (HEDERA_NETWORK) and reports timings. Protected by a secret in internal_secrets.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hederaConfig, parsePrivateKey } from "../_shared/hedera.ts";
 
 const SDK_VERSION = "2.51.0";
 
@@ -19,17 +20,16 @@ serve(async (req) => {
   try {
     const { Client, TopicCreateTransaction, TopicMessageSubmitTransaction, PrivateKey } =
       await import("npm:@hashgraph/sdk@2.51.0"); // keep in sync with hedera-sign
-    const accountId = Deno.env.get("HEDERA_ACCOUNT_ID");
-    const rawKey = Deno.env.get("HEDERA_PRIVATE_KEY");
+    const hedera = hederaConfig();
+    steps.network = hedera.network;
+    const accountId = hedera.accountId;
+    const rawKey = hedera.privateKey;
     steps.credentials = Boolean(accountId && rawKey);
     if (!accountId || !rawKey) throw new Error("Hedera credentials not configured");
 
-    let key;
-    try { key = PrivateKey.fromStringDer(rawKey); } catch {
-      try { key = PrivateKey.fromStringED25519(rawKey); } catch { key = PrivateKey.fromStringECDSA(rawKey); }
-    }
-    const client = Client.forTestnet().setOperator(accountId, key);
-    steps.topicIdEnv = Boolean(Deno.env.get("HEDERA_TOPIC_ID"));
+    const key = parsePrivateKey(PrivateKey, rawKey);
+    const client = (hedera.network === "mainnet" ? Client.forMainnet() : Client.forTestnet()).setOperator(accountId, key);
+    steps.topicIdEnv = Boolean(hedera.topicId);
 
     const topicTx = await new TopicCreateTransaction().setTopicMemo("certera.ink - health check").execute(client);
     const topicId = (await topicTx.getReceipt(client)).topicId!.toString();
@@ -45,6 +45,7 @@ serve(async (req) => {
       status: receipt.status.toString(),
       sequence: receipt.topicSequenceNumber?.toString(),
       txId: submitTx.transactionId?.toString(),
+      explorer: `${hedera.explorerBase}/topic/${topicId}`,
       ms: Date.now() - t1,
     };
     client.close();
