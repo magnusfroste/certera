@@ -26,7 +26,7 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError) {
+    if (claimsError || !claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -222,7 +222,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Test integration error:', error);
-    return new Response(JSON.stringify({ success: false, message: error.message }), {
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ success: false, message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
