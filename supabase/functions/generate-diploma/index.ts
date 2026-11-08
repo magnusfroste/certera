@@ -14,6 +14,7 @@ import {
   type CustomProvider,
 } from "../_shared/customProviders.ts";
 import { GUEST_ACCESS_KEY, parseGuestDailyLimit } from "../_shared/guestAccess.ts";
+import { FALLBACK_POLICY_KEY, parseFallbackBudget, startOfUtcDay, estimatedSpendUsd, isPaidProvider, type UsageRow } from "../_shared/fallbackBudget.ts";
 
 // ── Shared request/DSL types ──
 type ContentPart =
@@ -509,6 +510,10 @@ serve(async (req) => {
       userId = user?.id ?? null;
     }
 
+    // Undoes the guest's counted generation when nothing was generated, so a
+    // provider outage does not use up someone's free tries.
+    let refundGuest: () => Promise<void> = async () => {};
+
     // Guests are allowed a limited number of generations per IP per day,
     // enforced server-side (the localStorage counter in the client is only UX).
     // The number is set in /admin (app_settings.guest_access); 0 means an
@@ -542,12 +547,21 @@ serve(async (req) => {
       });
       // If the table doesn't exist yet (migration not applied), log but don't block guests.
       if (usageError) console.error('guest_usage upsert failed:', usageError.message);
+      else {
+        refundGuest = async () => {
+          try {
+            await supabaseAdmin.from('guest_usage').update({ count }).eq('ip_hash', ipHash);
+          } catch (e) {
+            console.error('guest_usage refund failed:', e instanceof Error ? e.message : e);
+          }
+        };
+      }
     }
 
     // Provider selection: the active choice plus any custom OpenAI-compatible
     // providers registered in /admin, in one round trip.
     const { data: settingRows } = await supabaseAdmin
-      .from('app_settings').select('key, value').in('key', ['ai_provider', CUSTOM_PROVIDERS_KEY]);
+      .from('app_settings').select('key, value').in('key', ['ai_provider', CUSTOM_PROVIDERS_KEY, FALLBACK_POLICY_KEY]);
     const settingFor = (k: string) => settingRows?.find((r) => r.key === k)?.value;
     const customProviders = parseCustomProviders(settingFor(CUSTOM_PROVIDERS_KEY));
     const customById = new Map(customProviders.filter((c) => c.enabled).map((c) => [c.id, c]));
@@ -654,6 +668,30 @@ serve(async (req) => {
         if (c.id !== provider && Deno.env.get(secretNameFor(c.id))) chain.push({ p: c.id, m: c.models[0] });
       }
     }
+    // Paid-reserve cap (app_settings.fallback_policy, see _shared/fallbackBudget.ts).
+    // Only paid fallback steps are capped; the active provider and free custom
+    // providers always run. Today's
+    // spend is read once per request, so a burst of concurrent requests can
+    // overshoot the cap by a few generations — it is a budget, not a meter.
+    const fallbackBudget = parseFallbackBudget(settingFor(FALLBACK_POLICY_KEY));
+    let fallbackAllowed = true;
+    if (fallbackBudget !== null && chain.slice(1).some((s) => isPaidProvider(s.p))) {
+      if (fallbackBudget === 0) {
+        fallbackAllowed = false;
+      } else {
+        const { data: rows, error: spendErr } = await supabaseAdmin
+          .from('generation_usage')
+          .select('provider, model, input_tokens, output_tokens')
+          .eq('fell_back', true)
+          .gte('created_at', startOfUtcDay());
+        // If spend cannot be read, stay inside the budget: no paid fallback.
+        const spent = spendErr ? Infinity : estimatedSpendUsd((rows ?? []) as UsageRow[]);
+        if (spendErr) console.error('fallback spend lookup failed:', spendErr.message);
+        fallbackAllowed = spent < fallbackBudget;
+      }
+    }
+    let skippedForBudget = false;
+
     // Token accounting. Best-effort telemetry: a logging failure must never
     // break a generation the user already paid for in latency, so this never
     // throws and is not awaited into the critical path's error handling.
@@ -684,6 +722,10 @@ serve(async (req) => {
     let usedModel = model;
     for (const step of chain) {
       const fellBack = step.p !== provider;
+      if (fellBack && !fallbackAllowed && isPaidProvider(step.p)) {
+        skippedForBudget = true;
+        continue;
+      }
       let attempt: AIResponse | undefined;
       try {
         attempt = await callProvider(step.p, step.m);
@@ -706,7 +748,17 @@ serve(async (req) => {
         await recordUsage(step.p, step.m, attempt?.usage, false, fellBack, attempt?.answeredModel);
       }
     }
-    if (!result!) throw lastErr || new Error('All providers failed');
+    if (!result!) {
+      await refundGuest();
+      if (skippedForBudget) {
+        console.warn(`Fallback skipped: daily fallback budget (${fallbackBudget} USD) reached`);
+        return new Response(JSON.stringify({
+          error: 'busy',
+          message: 'Our AI is busy right now. Please try again in a minute.',
+        }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } });
+      }
+      throw lastErr || new Error('All providers failed');
+    }
 
     if (isIteration && !dslIteration) {
       const strip = (s: string) => s.replace(/```(?:html|css|)\s*/gi,'').replace(/```\s*/g,'').trim();
