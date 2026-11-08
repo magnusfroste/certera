@@ -9,6 +9,10 @@ const corsHeaders = {
 
 
 import { renderDSL, esc, PALETTES, PALETTE_IDS, TYPOGRAPHY_IDS, type DiplomaDSL } from "../_shared/diplomaRenderer.ts";
+import {
+  CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat,
+  type CustomProvider,
+} from "../_shared/customProviders.ts";
 
 // ── Shared request/DSL types ──
 type ContentPart =
@@ -220,7 +224,9 @@ Return the COMPLETE updated design (all fields, not just the changed ones).`;
 // 10. PROVIDER ADAPTERS (structured output, provider-agnostic)
 // ─────────────────────────────────────────────────────────────────
 interface TokenUsage { inputTokens: number; outputTokens: number }
-interface AIResponse { text: string; json?: DiplomaDSL; usage?: TokenUsage }
+// answeredModel: set when a router (e.g. garageai/auto) names the model that
+// actually served the request, which can differ from the one asked for.
+interface AIResponse { text: string; json?: DiplomaDSL; usage?: TokenUsage; answeredModel?: string }
 
 /**
  * Providers report token counts under different names. Normalise whatever the
@@ -359,6 +365,24 @@ async function callOpenRouter(systemPrompt: string, messages: AIMessage[], model
   return { text, usage: readUsage(data.usage) };
 }
 
+/** Any OpenAI-compatible endpoint registered in /admin (see _shared/customProviders.ts). */
+async function callCustom(
+  provider: CustomProvider, systemPrompt: string, messages: AIMessage[], model: string, structured: boolean,
+): Promise<AIResponse> {
+  const secret = secretNameFor(provider.id);
+  const apiKey = Deno.env.get(secret);
+  if (!apiKey) throw new Error(`${secret} not configured`);
+
+  const { data } = await openAICompatibleChat(
+    provider,
+    apiKey,
+    { model, max_tokens: 4000, messages: toOpenAIMessages(systemPrompt, messages) },
+    structured ? { schema: { name: 'diploma_dsl', schema: DSL_JSON_SCHEMA } } : {},
+  );
+  const { text, answeredModel } = readChat(data);
+  return { text, usage: readUsage(data.usage), answeredModel: answeredModel ?? undefined };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // 11. JSON extraction fallback
 // ─────────────────────────────────────────────────────────────────
@@ -469,7 +493,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, requestType, imageData, url, currentHtml, currentCss, currentDsl, userFullName } = await req.json();
+    const { messages, requestType, imageData, url, currentHtml, currentCss, currentDsl, userFullName, providerOverride } = await req.json();
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -512,11 +536,39 @@ serve(async (req) => {
       if (usageError) console.error('guest_usage upsert failed:', usageError.message);
     }
 
-    // Provider selection
-    const { data: settingData } = await supabaseAdmin.from('app_settings').select('value').eq('key','ai_provider').single();
-    const cfg = (settingData?.value as { provider: string; model: string }) || { provider: 'anthropic', model: 'claude-sonnet-4-20250514' };
+    // Provider selection: the active choice plus any custom OpenAI-compatible
+    // providers registered in /admin, in one round trip.
+    const { data: settingRows } = await supabaseAdmin
+      .from('app_settings').select('key, value').in('key', ['ai_provider', CUSTOM_PROVIDERS_KEY]);
+    const settingFor = (k: string) => settingRows?.find((r) => r.key === k)?.value;
+    const customProviders = parseCustomProviders(settingFor(CUSTOM_PROVIDERS_KEY));
+    const customById = new Map(customProviders.filter((c) => c.enabled).map((c) => [c.id, c]));
+    let cfg = (settingFor('ai_provider') as { provider: string; model: string }) || { provider: 'anthropic', model: 'claude-sonnet-4-20250514' };
+
+    // Admins can try a provider/model without switching it for every visitor
+    // (the "Test diploma" button in /admin). Honoured only for a verified admin:
+    // the body is never trusted for anything that changes who pays or what runs.
+    let isProviderTest = false;
+    if (providerOverride && typeof providerOverride === 'object') {
+      const o = providerOverride as { provider?: unknown; model?: unknown };
+      const { data: role } = userId
+        ? await supabaseAdmin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'admin').maybeSingle()
+        : { data: null };
+      if (!role) {
+        return new Response(JSON.stringify({ error: 'providerOverride is only available to admins' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (typeof o.provider !== 'string' || typeof o.model !== 'string' || !o.model.trim()) {
+        return new Response(JSON.stringify({ error: 'providerOverride needs a provider and a model' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      cfg = { provider: o.provider, model: o.model.trim() };
+      isProviderTest = true;
+    }
     const { provider, model } = cfg;
-    console.log(`Provider: ${provider}, model: ${model}`);
+    console.log(`Provider: ${provider}, model: ${model}${isProviderTest ? ' (admin test)' : ''}`);
 
     const isIteration = !!(currentHtml && currentCss) && requestType !== 'image' && requestType !== 'url';
     // DSL-native iteration when the client still has the structured design;
@@ -557,6 +609,8 @@ serve(async (req) => {
     // Call provider
     let result: AIResponse;
     const callProvider = async (p: string, m: string, msgs: AIMessage[] = aiMessages): Promise<AIResponse> => {
+      const custom = customById.get(p);
+      if (custom) return callCustom(custom, systemPrompt, msgs, m, structured);
       switch (p) {
         case 'openai':     return callOpenAI(systemPrompt, msgs, m, structured);
         case 'gemini':     return callGemini(systemPrompt, msgs, m, structured);
@@ -580,9 +634,16 @@ serve(async (req) => {
       openrouter: 'OPENROUTER_API_KEY',
     };
     const chain: { p: string; m: string }[] = [{ p: provider, m: model }];
-    for (const p of ['anthropic', 'openai', 'gemini', 'openrouter']) {
-      if (p !== provider && Deno.env.get(keyEnv[p])) {
-        chain.push({ p, m: defaultModelFor[p] });
+    // An admin test measures exactly one provider: falling back would show
+    // another provider's diploma under the tested one's name.
+    if (!isProviderTest) {
+      for (const p of ['anthropic', 'openai', 'gemini', 'openrouter']) {
+        if (p !== provider && Deno.env.get(keyEnv[p])) {
+          chain.push({ p, m: defaultModelFor[p] });
+        }
+      }
+      for (const c of customById.values()) {
+        if (c.id !== provider && Deno.env.get(secretNameFor(c.id))) chain.push({ p: c.id, m: c.models[0] });
       }
     }
     // Token accounting. Best-effort telemetry: a logging failure must never
@@ -590,14 +651,16 @@ serve(async (req) => {
     // throws and is not awaited into the critical path's error handling.
     const recordUsage = async (
       p: string, m: string, usage: TokenUsage | undefined, succeeded: boolean, fellBack: boolean,
+      answeredModel?: string,
     ) => {
       try {
         await supabaseAdmin.from('generation_usage').insert({
           provider: p,
-          model: m,
+          // Record what actually served it when a router picked the model.
+          model: answeredModel && answeredModel !== m ? `${m} (${answeredModel})` : m,
           input_tokens: usage?.inputTokens ?? 0,
           output_tokens: usage?.outputTokens ?? 0,
-          phase: isIteration ? 'iterate' : 'generate',
+          phase: isProviderTest ? 'admin-test' : isIteration ? 'iterate' : 'generate',
           fell_back: fellBack,
           succeeded,
           user_id: userId,
@@ -613,19 +676,26 @@ serve(async (req) => {
     let usedModel = model;
     for (const step of chain) {
       const fellBack = step.p !== provider;
+      let attempt: AIResponse | undefined;
       try {
-        result = await callProvider(step.p, step.m);
+        attempt = await callProvider(step.p, step.m);
+        // A structured answer that is not usable JSON is a failed attempt, not
+        // a result: smaller models sometimes return prose or broken JSON, and
+        // treating that as success would skip the fallback and fail the user.
+        if (structured && !attempt.json) attempt.json = extractJson(attempt.text);
+        result = attempt;
         usedProvider = step.p;
         usedModel = step.m;
         if (fellBack) console.warn(`Fell back from ${provider} to ${step.p}`);
-        await recordUsage(step.p, step.m, result.usage, true, fellBack);
+        await recordUsage(step.p, step.m, attempt.usage, true, fellBack, attempt.answeredModel);
         break;
       } catch (e) {
         lastErr = e;
         console.error(`Provider ${step.p} failed:`, e instanceof Error ? e.message : e);
         // Log the failed attempt too — an outage that burns the fallback chain
-        // is exactly what an operator needs to see afterwards.
-        await recordUsage(step.p, step.m, undefined, false, fellBack);
+        // is exactly what an operator needs to see afterwards. Tokens spent on
+        // an unparseable answer are kept, so they show up as wasted.
+        await recordUsage(step.p, step.m, attempt?.usage, false, fellBack, attempt?.answeredModel);
       }
     }
     if (!result!) throw lastErr || new Error('All providers failed');
@@ -685,6 +755,7 @@ serve(async (req) => {
       css: rendered.css,
       provider: usedProvider,
       model: usedModel,
+      answeredModel: result.answeredModel ?? null,
       dsl,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 

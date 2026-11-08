@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat, ProviderHttpError,
+} from "../_shared/customProviders.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -210,6 +213,37 @@ serve(async (req) => {
       }
 
     } else {
+      // A custom OpenAI-compatible provider registered in /admin.
+      const { data: setting } = await supabase
+        .from('app_settings').select('value').eq('key', CUSTOM_PROVIDERS_KEY).maybeSingle();
+      const custom = parseCustomProviders(setting?.value).find((c) => c.id === provider);
+      if (custom) {
+        const secret = secretNameFor(custom.id);
+        const apiKey = Deno.env.get(secret);
+        if (!apiKey) {
+          return new Response(JSON.stringify({ success: false, message: `${secret} not configured. Add it as a Supabase secret.` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const selectedModel = model || custom.models[0];
+        try {
+          const { data } = await openAICompatibleChat(custom, apiKey, {
+            model: selectedModel,
+            max_tokens: 50,
+            messages: [{ role: 'user', content: 'Say "Integration test OK" in exactly those words.' }],
+          }, { timeoutMs: 45_000 });
+          const { text, answeredModel } = readChat(data);
+          // A router such as garageai/auto names the model that answered.
+          const served = answeredModel && answeredModel !== selectedModel ? ` (answered by ${answeredModel})` : '';
+          result = { success: true, message: (text || 'No response') + served, model: selectedModel, latencyMs: Date.now() - start };
+        } catch (e) {
+          const message = e instanceof ProviderHttpError
+            ? `API error ${e.status}: ${e.body.substring(0, 200)}`
+            : e instanceof Error ? e.message : String(e);
+          result = { success: false, message, model: selectedModel, latencyMs: Date.now() - start };
+        }
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       return new Response(JSON.stringify({ success: false, message: `Unknown provider: ${provider}` }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

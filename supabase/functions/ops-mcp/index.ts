@@ -27,6 +27,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat, ProviderHttpError,
+  type CustomProvider,
+} from "../_shared/customProviders.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -201,6 +205,9 @@ function classify(status: number, body: string): { status: ProviderStatus; detai
     b.includes('insufficient_quota') ||
     b.includes('insufficient credits') ||
     b.includes('exceeded your current quota') ||
+    // LiteLLM gateways (e.g. GarageAI) report an exhausted key budget this way.
+    b.includes('budget has been exceeded') ||
+    b.includes('budget_exceeded') ||
     b.includes('billing');
   if (broke) return { status: 'out_of_credits', detail: brief };
   if (status === 429) return { status: 'rate_limited', detail: brief };
@@ -322,6 +329,34 @@ async function probeFirecrawl(): Promise<ProviderReport> {
   }
 }
 
+/** Custom OpenAI-compatible providers registered in /admin (app_settings.custom_providers). */
+async function loadCustomProviders(): Promise<CustomProvider[]> {
+  const { data } = await admin().from('app_settings').select('value').eq('key', CUSTOM_PROVIDERS_KEY).maybeSingle();
+  return parseCustomProviders(data?.value);
+}
+
+/** One-token chat against a custom provider: ok, or the classified error. */
+async function pingCustom(c: CustomProvider, model: string): Promise<{ ok: boolean; detail: string; status: ProviderStatus; latencyMs: number }> {
+  const key = Deno.env.get(secretNameFor(c.id));
+  const started = Date.now();
+  if (!key) return { ok: false, status: 'no_key', detail: `${secretNameFor(c.id)} not set`, latencyMs: 0 };
+  try {
+    const { data } = await openAICompatibleChat(
+      c, key, { model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }, { timeoutMs: 30_000 },
+    );
+    const { answeredModel } = readChat(data);
+    const served = answeredModel && answeredModel !== model ? ` (answered by ${answeredModel})` : '';
+    return { ok: true, status: 'ok', detail: `${c.id}/${model} responded${served}`, latencyMs: Date.now() - started };
+  } catch (e) {
+    const latencyMs = Date.now() - started;
+    if (e instanceof ProviderHttpError) {
+      const { status, detail } = classify(e.status, e.body);
+      return { ok: false, status, detail, latencyMs };
+    }
+    return { ok: false, status: 'error', detail: (e as Error).message, latencyMs };
+  }
+}
+
 /**
  * Verify one specific provider+model with a minimal real call.
  * set_ai_provider runs this before persisting, so a typo'd or retired model id
@@ -329,6 +364,11 @@ async function probeFirecrawl(): Promise<ProviderReport> {
  * notices. Costs a fraction of a cent.
  */
 async function probeModel(provider: string, model: string): Promise<{ ok: boolean; detail: string }> {
+  const custom = (await loadCustomProviders()).find((c) => c.id === provider);
+  if (custom) {
+    const { ok, detail } = await pingCustom(custom, model);
+    return { ok, detail };
+  }
   try {
     let res: Response;
     if (provider === 'anthropic') {
@@ -685,12 +725,20 @@ const TOOLS: Record<string, ToolDef> = {
     },
     handler: async (args) => {
       const deep = args.deep === undefined ? true : Boolean(args.deep);
+      // Custom providers expose no balance to a normal key (GarageAI's LiteLLM
+      // admin API needs the master key), so they are always probed with a real
+      // 1-token call — the only way an exhausted budget surfaces.
+      const customs = (await loadCustomProviders()).filter((c) => c.enabled);
       const reports = await Promise.all([
         probeAnthropic(deep),
         probeOpenRouter(),
         probeOpenAI(deep),
         probeGemini(),
         probeFirecrawl(),
+        ...customs.map(async (c): Promise<ProviderReport> => {
+          const r = await pingCustom(c, c.models[0]);
+          return { provider: c.id, status: r.status, detail: r.detail, latencyMs: r.latencyMs || undefined };
+        }),
       ]);
       // The app's default provider is Anthropic with the others as fallback, so
       // generation only truly stops when every configured LLM provider is down.
@@ -798,8 +846,19 @@ const TOOLS: Record<string, ToolDef> = {
     handler: async () => {
       const { data } = await admin().from('app_settings').select('value').eq('key', 'ai_provider').maybeSingle();
       const active = (data?.value as { provider?: string; model?: string }) ?? null;
+      const customs = await loadCustomProviders();
       return {
         active,
+        // Registered in /admin; no price catalogue, so their usage is costed at 0.
+        customProviders: customs.map((c) => ({
+          provider: c.id,
+          label: c.label,
+          baseUrl: c.baseUrl,
+          enabled: c.enabled,
+          secret: secretNameFor(c.id),
+          keyConfigured: Boolean(Deno.env.get(secretNameFor(c.id))),
+          models: c.models,
+        })),
         note: 'OpenRouter also accepts models outside this list; set_ai_provider verifies any model it does not recognise before saving.',
         providers: PROVIDERS.map((p) => ({
           provider: p,
@@ -818,7 +877,7 @@ const TOOLS: Record<string, ToolDef> = {
     inputSchema: {
       type: 'object',
       properties: {
-        provider: { type: 'string', description: `One of: ${PROVIDERS.join(', ')}. Omit to keep the current provider.` },
+        provider: { type: 'string', description: `One of: ${PROVIDERS.join(', ')}, or the id of a custom provider registered in /admin (see list_models). Omit to keep the current provider.` },
         model: { type: 'string', description: 'Model id for that provider. Omit to use the provider\'s first catalogue model.' },
         verify: { type: 'boolean', description: 'Probe the combination before saving (default true). Only set false if the provider is known-good but temporarily unreachable.' },
       },
@@ -828,16 +887,21 @@ const TOOLS: Record<string, ToolDef> = {
       const now = (current?.value as { provider?: string; model?: string }) ?? {};
 
       const provider = String(args.provider ?? now.provider ?? 'anthropic');
-      if (!PROVIDERS.includes(provider)) {
-        throw new Error(`Unknown provider "${provider}". Valid: ${PROVIDERS.join(', ')}`);
+      const custom = (await loadCustomProviders()).find((c) => c.id === provider);
+      if (!PROVIDERS.includes(provider) && !custom) {
+        throw new Error(`Unknown provider "${provider}". Valid: ${PROVIDERS.join(', ')}, or a custom provider id from list_models.`);
+      }
+      if (custom && !custom.enabled) {
+        throw new Error(`Refusing to switch: custom provider "${provider}" is disabled in /admin.`);
       }
       // Changing provider without naming a model would otherwise carry the old
       // provider's model across and break the call.
-      const model = String(
-        args.model ?? (provider === now.provider ? now.model ?? CATALOGUE[provider][0].id : CATALOGUE[provider][0].id),
-      );
+      const firstModel = custom ? custom.models[0] : CATALOGUE[provider][0].id;
+      const model = String(args.model ?? (provider === now.provider ? now.model ?? firstModel : firstModel));
 
-      const keyEnv = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', openrouter: 'OPENROUTER_API_KEY' }[provider] as string;
+      const keyEnv = custom
+        ? secretNameFor(custom.id)
+        : { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', openrouter: 'OPENROUTER_API_KEY' }[provider] as string;
       if (!Deno.env.get(keyEnv)) {
         throw new Error(`Refusing to switch: ${keyEnv} is not configured, so ${provider} cannot serve generations.`);
       }

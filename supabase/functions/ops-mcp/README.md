@@ -145,6 +145,16 @@ Models outside the built-in catalogue are allowed — OpenRouter alone exposes
 hundreds — but they have no price entry, so their cost is reported as 0 and
 `get_token_usage` says how many calls that affected.
 
+### Custom providers
+
+Providers registered in /admin → Integrations (any OpenAI-compatible endpoint,
+e.g. GarageAI) appear in `list_models` under `customProviders`, can be made
+active with `set_ai_provider` (same verification before saving), and are
+probed by `check_providers`. They expose no balance to a normal key, so the
+probe is always a real 1-token call; a LiteLLM "Budget has been exceeded"
+answer is reported as `out_of_credits`. Their key is the Supabase secret
+`LLM_<ID>_API_KEY`.
+
 ## Token accounting
 
 `get_token_usage` reads `generation_usage`, written by `generate-diploma` on
