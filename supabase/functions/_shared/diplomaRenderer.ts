@@ -121,6 +121,9 @@ function compositionCss(comp: Composition, primary: string, accent: string, inne
 // ─────────────────────────────────────────────────────────────────
 function decorationCss(decos: string[], primary: string, accent: string): string {
   const out: string[] = [];
+  // Pattern decorations are collected and drawn on their own layer below.
+  const patternLayers: string[] = [];
+  const patternSizes: string[] = [];
   for (const d of decos.slice(0, 2)) {
     switch (d) {
       case 'corner-flourishes':
@@ -133,15 +136,28 @@ function decorationCss(decos: string[], primary: string, accent: string): string
         out.push(`.deco-ribbon{position:relative;overflow:hidden}.deco-ribbon::before{content:'EST.';position:absolute;top:18px;right:-40px;background:${accent};color:#fff;padding:4px 50px;font-size:11px;font-weight:bold;letter-spacing:3px;transform:rotate(45deg);z-index:3}`);
         break;
       case 'guilloche-pattern':
-        out.push(`.deco-guilloche{background-image:repeating-radial-gradient(circle at 0 0,transparent 0,${primary}08 1px,transparent 2px,transparent 18px),repeating-radial-gradient(circle at 100% 100%,transparent 0,${accent}08 1px,transparent 2px,transparent 18px)}`);
+        patternLayers.push(`repeating-radial-gradient(circle at 0 0,transparent 0,${primary}08 1px,transparent 2px,transparent 18px)`, `repeating-radial-gradient(circle at 100% 100%,transparent 0,${accent}08 1px,transparent 2px,transparent 18px)`);
+        patternSizes.push('auto', 'auto');
         break;
       case 'laurel-side':
         out.push(`.deco-laurel .diploma-body{position:relative;padding:0 56px}.deco-laurel .diploma-body::before,.deco-laurel .diploma-body::after{content:'❧';position:absolute;top:50%;transform:translateY(-50%);color:${accent};font-size:32px;opacity:.3}.deco-laurel .diploma-body::before{left:8px;transform:translateY(-50%) scaleX(-1)}.deco-laurel .diploma-body::after{right:8px}`);
         break;
       case 'subtle-grid':
-        out.push(`.deco-grid{background-image:linear-gradient(${primary}06 1px,transparent 1px),linear-gradient(90deg,${primary}06 1px,transparent 1px);background-size:24px 24px}`);
+        patternLayers.push(`linear-gradient(${primary}06 1px,transparent 1px)`, `linear-gradient(90deg,${primary}06 1px,transparent 1px)`);
+        patternSizes.push('24px 24px', '24px 24px');
         break;
     }
+  }
+  if (patternLayers.length) {
+    // Patterns sit on the container's ::after, BEHIND the content (z-index:-1
+    // inside an isolated stacking context) and above the background. They used
+    // to set background-image on the container itself, which has the same
+    // specificity as the palette background and comes later, so it replaced
+    // it: nearly every background is a gradient (an image), and a dark one
+    // such as cosmic-dark vanished, leaving the light text it was picked for
+    // on a white page — an unreadable diploma. ::after on the container is
+    // free: the other decorations use ::before / the border and body.
+    out.push(`.deco-grid,.deco-guilloche{position:relative;isolation:isolate}.deco-grid::after,.deco-guilloche::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:${patternLayers.join(',')};background-size:${patternSizes.join(',')}}`);
   }
   return out.join('\n');
 }
