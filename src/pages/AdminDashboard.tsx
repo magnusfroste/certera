@@ -12,6 +12,7 @@ import { Shield, Users, FileText, Home, Loader2, Settings, Layers, Palette, KeyR
 import AdminIntegrations from '@/components/AdminIntegrations';
 import AdminBranding from '@/components/AdminBranding';
 import AdminOpsTokens from '@/components/AdminOpsTokens';
+import AdminGuestAccess from '@/components/AdminGuestAccess';
 import { toast } from 'sonner';
 
 interface DiplomaRow {
@@ -216,7 +217,8 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="users">
+          <TabsContent value="users" className="space-y-4">
+            <AdminGuestAccess />
             <Card>
               <CardHeader>
                 <CardTitle>Users & Roles</CardTitle>

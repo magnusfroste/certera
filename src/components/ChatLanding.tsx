@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useGeneration } from '@/hooks/useGeneration';
@@ -19,8 +20,13 @@ interface ChatLandingProps {
 export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
   const [message, setMessage] = useState('');
   const { isGenerating, generateFromText, generateFromImage, generateFromUrl, applyRecipe } = useGeneration(isGuest, guestAccess);
+  // A guest out of free generations. The landing view has no chat to show an
+  // error in, so without this the prompt was cleared and nothing happened —
+  // exactly at the moment the visitor should be asked to create an account.
+  const guestBlocked = !!isGuest && !!guestAccess && !guestAccess.canGenerate;
 
   const handleSendMessage = async () => {
+    if (guestBlocked) return; // keep the prompt; the notice below explains why
     const text = message;
     setMessage('');
     await generateFromText(text);
@@ -46,6 +52,19 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
           <p className="text-muted-foreground text-sm max-w-md mx-auto">Describe your vision, upload an image, or let the AI design it for you.</p>
         </div>
 
+        {guestBlocked && (
+          <div role="status" className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground space-y-2">
+            <p>
+              {guestAccess!.maxGenerations === 0
+                ? 'Create a free account to generate diplomas.'
+                : `You've used your ${guestAccess!.maxGenerations} free diploma${guestAccess!.maxGenerations === 1 ? '' : 's'} for today. Create a free account to keep going — and to save, sign and share your diplomas.`}
+            </p>
+            <Button asChild size="sm">
+              <Link to="/auth">Create free account</Link>
+            </Button>
+          </div>
+        )}
+
         <div className="relative bg-card border border-border rounded-2xl shadow-lg shadow-black/20">
           <Textarea
             value={message}
@@ -66,7 +85,7 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
 
             <Button
               onClick={handleSendMessage}
-              disabled={!message.trim() || isGenerating}
+              disabled={!message.trim() || isGenerating || guestBlocked}
               size="sm"
               aria-label="Send message"
               className="h-8 w-8 p-0 rounded-full bg-primary hover:bg-primary/90"

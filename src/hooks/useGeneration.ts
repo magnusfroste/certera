@@ -76,7 +76,9 @@ export function useGeneration(isGuest?: boolean, guestAccess?: GuestAccess) {
     async (userText: string) => {
       if (!userText.trim() || isGenerating) return;
       if (isGuest && guestAccess && !guestAccess.canGenerate) {
-        addError('You have used all your free generations. Create an account for unlimited access!');
+        addError(guestAccess.maxGenerations === 0
+          ? 'Create a free account to generate diplomas.'
+          : 'You have used all your free generations. Create an account for unlimited access!');
         return;
       }
 

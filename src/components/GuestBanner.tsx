@@ -17,7 +17,9 @@ export const GuestBanner = ({ remainingGenerations, maxGenerations }: GuestBanne
         <Sparkles className="w-4 h-4" />
         <span>Guest Mode</span>
         <Badge variant="secondary" className="text-xs">
-          {remainingGenerations}/{maxGenerations} generations left
+          {maxGenerations === 0
+            ? 'Sign in to generate'
+            : `${remainingGenerations}/${maxGenerations} generations left`}
         </Badge>
       </div>
       <Button

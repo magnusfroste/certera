@@ -31,6 +31,9 @@ import {
   CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat, ProviderHttpError,
   type CustomProvider,
 } from "../_shared/customProviders.ts";
+import {
+  GUEST_ACCESS_KEY, MAX_GUEST_DAILY_LIMIT, isValidGuestDailyLimit, parseGuestDailyLimit,
+} from "../_shared/guestAccess.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -597,21 +600,51 @@ const TOOLS: Record<string, ToolDef> = {
 
   get_guest_usage: {
     description:
-      'Guest generation rate-limit state: how many anonymous generations have run in the current 24h windows and how many IPs hit the cap.',
+      'Guest generation rate-limit state: the configured free daily limit, how many anonymous generations have run in the current 24h windows and how many IPs hit the cap.',
     inputSchema: { type: 'object', properties: {} },
     handler: async () => {
+      const { data: setting } = await admin().from('app_settings').select('value').eq('key', GUEST_ACCESS_KEY).maybeSingle();
+      const dailyLimit = parseGuestDailyLimit(setting?.value);
       const { data, error } = await admin().from('guest_usage').select('count, window_start');
       if (error) throw new Error(error.message);
       const rows = data ?? [];
       const active = rows.filter((r: { window_start: string }) => Date.now() - new Date(r.window_start).getTime() <= DAY_MS);
       const total = active.reduce((s: number, r: { count: number }) => s + (r.count ?? 0), 0);
       return {
+        dailyLimit,
+        limitSource: setting ? 'admin setting' : 'default (no setting saved)',
         activeWindows: active.length,
         generationsInActiveWindows: total,
-        ipsAtOrAboveCap: active.filter((r: { count: number }) => (r.count ?? 0) >= 3).length,
+        ipsAtOrAboveCap: active.filter((r: { count: number }) => (r.count ?? 0) >= dailyLimit).length,
         staleWindows: rows.length - active.length,
         note: 'IPs are stored hashed; individual guests are not identifiable here.',
       };
+    },
+  },
+
+  set_guest_limit: {
+    description:
+      `How many diplomas a visitor may generate per day without an account. WRITE — applies to the next guest request. 0 requires an account; maximum ${MAX_GUEST_DAILY_LIMIT}. Signed-in users are never limited.`,
+    inputSchema: {
+      type: 'object',
+      properties: { daily_limit: { type: 'number', description: `Whole number, 0-${MAX_GUEST_DAILY_LIMIT}.` } },
+      required: ['daily_limit'],
+    },
+    handler: async (args) => {
+      const dailyLimit = Number(args.daily_limit);
+      if (!isValidGuestDailyLimit(dailyLimit)) {
+        throw new Error(`daily_limit must be a whole number from 0 to ${MAX_GUEST_DAILY_LIMIT}.`);
+      }
+      const { data: before } = await admin().from('app_settings').select('value').eq('key', GUEST_ACCESS_KEY).maybeSingle();
+      // Select back the row: an upsert that silently wrote nothing would leave
+      // the caller believing the limit changed.
+      const { data: saved, error } = await admin()
+        .from('app_settings')
+        .upsert({ key: GUEST_ACCESS_KEY, value: { dailyLimit }, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .select('value');
+      if (error) throw new Error(`Save failed: ${error.message}`);
+      if (!saved || saved.length === 0) throw new Error('Save failed: nothing was written.');
+      return { previous: parseGuestDailyLimit(before?.value), dailyLimit, accountRequired: dailyLimit === 0 };
     },
   },
 

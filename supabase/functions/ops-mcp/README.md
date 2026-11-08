@@ -65,7 +65,8 @@ makes the key check the *only* gate — treat keys as production credentials.
 | `get_diploma_volume` | Daily sessions created vs diplomas signed, plus top institutions. |
 | `list_recent_diplomas` | Most recently signed diplomas (recipient, institution, blockchain id). |
 | `get_traffic` | Page views and visitors per day, how many got past the landing page into the demo and sign-up, top pages, referrers, devices, countries. Crawlers excluded by default. See below. |
-| `get_guest_usage` | Guest rate-limit state: generations in the active 24h windows, IPs at the cap. |
+| `get_guest_usage` | The free daily guest limit, generations in the active 24h windows, and IPs at the cap. |
+| `set_guest_limit` | **Write.** How many diplomas a visitor may generate per day without an account (0 = account required). Same setting as /admin → Users & Roles → Guest access. |
 | `check_providers` | Live provider health — the credit alarm. See below. |
 | `get_settings` | Current `app_settings` key/value configuration. |
 | `get_token_usage` | Tokens and estimated cost per day and per provider/model, including spend wasted on failed calls and fallback. |
