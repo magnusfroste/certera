@@ -13,6 +13,7 @@ import {
   CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat,
   type CustomProvider,
 } from "../_shared/customProviders.ts";
+import { GUEST_ACCESS_KEY, parseGuestDailyLimit } from "../_shared/guestAccess.ts";
 
 // ── Shared request/DSL types ──
 type ContentPart =
@@ -510,8 +511,12 @@ serve(async (req) => {
 
     // Guests are allowed a limited number of generations per IP per day,
     // enforced server-side (the localStorage counter in the client is only UX).
+    // The number is set in /admin (app_settings.guest_access); 0 means an
+    // account is required.
     if (!isAuthenticated) {
-      const GUEST_DAILY_LIMIT = 10;
+      const { data: guestSetting } = await supabaseAdmin
+        .from('app_settings').select('value').eq('key', GUEST_ACCESS_KEY).maybeSingle();
+      const GUEST_DAILY_LIMIT = parseGuestDailyLimit(guestSetting?.value);
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
       const ipHash = Array.from(
         new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip))),
@@ -523,7 +528,10 @@ serve(async (req) => {
       const count = windowExpired ? 0 : usage.count;
 
       if (count >= GUEST_DAILY_LIMIT) {
-        return new Response(JSON.stringify({ error: 'Guest limit reached', message: 'You have used all free generations for today. Create an account for unlimited access!' }), {
+        const message = GUEST_DAILY_LIMIT === 0
+          ? 'Create a free account to generate diplomas.'
+          : 'You have used all free generations for today. Create an account for unlimited access!';
+        return new Response(JSON.stringify({ error: 'Guest limit reached', message }), {
           status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

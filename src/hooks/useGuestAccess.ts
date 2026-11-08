@@ -1,7 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+// The same rule the server enforces, so the count shown here is the real one.
+import {
+  DEFAULT_GUEST_DAILY_LIMIT,
+  GUEST_ACCESS_KEY,
+  parseGuestDailyLimit,
+} from '../../supabase/functions/_shared/guestAccess';
 
 const GUEST_KEY = 'certera_guest_usage';
-const MAX_GUEST_GENERATIONS = 3;
 
 interface GuestUsage {
   count: number;
@@ -33,8 +39,26 @@ export const useGuestAccess = () => {
   };
 
   const [usage, setUsage] = useState<GuestUsage>(getUsage);
+  // Set in /admin (app_settings.guest_access, readable by everyone). Until it
+  // loads, the default applies — the server enforces the real value anyway.
+  const [maxGenerations, setMaxGenerations] = useState(DEFAULT_GUEST_DAILY_LIMIT);
 
-  const remainingGenerations = MAX_GUEST_GENERATIONS - usage.count;
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', GUEST_ACCESS_KEY)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setMaxGenerations(parseGuestDailyLimit(data?.value));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const remainingGenerations = Math.max(0, maxGenerations - usage.count);
   const canGenerate = remainingGenerations > 0;
 
   const incrementUsage = useCallback(() => {
@@ -49,6 +73,6 @@ export const useGuestAccess = () => {
     remainingGenerations,
     canGenerate,
     incrementUsage,
-    maxGenerations: MAX_GUEST_GENERATIONS,
+    maxGenerations,
   };
 };
