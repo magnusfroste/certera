@@ -364,6 +364,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_diploma: {
+        Args: { p_blockchain_id: string }
+        Returns: {
+          blockchain_id: string
+          content_hash: string
+          created_at: string
+          diploma_css: string
+          diploma_html: string
+          diploma_url: string | null
+          diplomator_seal: string
+          institution_name: string
+          recipient_name: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

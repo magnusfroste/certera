@@ -5,7 +5,7 @@
 // from the public mirror node and compare the hashes it carries against values
 // recomputed from the diploma, so tampering with the database is detectable and
 // anyone can verify independently (the mirror node is a public, CORS-enabled API).
-import { supabase } from '@/integrations/supabase/client';
+import { fetchPublicDiploma } from '@/services/publicDiploma';
 
 export interface VerifyCheck {
   key: string;
@@ -91,13 +91,9 @@ async function fetchHcsMessage(
 }
 
 export async function verifyDiploma(diplomaId: string, recipientNameInput?: string): Promise<VerifyResult> {
-  const { data: row, error } = await supabase
-    .from('signed_diplomas')
-    .select('blockchain_id, recipient_name, institution_name, diploma_html, diploma_css, content_hash, diplomator_seal, created_at')
-    .eq('blockchain_id', diplomaId.trim())
-    .maybeSingle();
+  const { data: row, error } = await fetchPublicDiploma(diplomaId.trim());
 
-  if (error) return { verified: false, onChainVerified: false, checks: [], error: `Database error: ${error.message}` };
+  if (error) return { verified: false, onChainVerified: false, checks: [], error: `Database error: ${error}` };
   if (!row) return { verified: false, onChainVerified: false, checks: [], error: 'No diploma found for that ID.' };
 
   const record: VerifiedRecord = {

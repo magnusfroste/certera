@@ -1,24 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ExternalLink, Shield } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
+import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
 import { SITE_URL } from '@/lib/siteUrl';
 
 const DiplomaEmbed = () => {
   const { diplomaId } = useParams();
-  const [diplomaData, setDiplomaData] = useState<Tables<'signed_diplomas'> | null>(null);
+  const [diplomaData, setDiplomaData] = useState<PublicDiploma | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!diplomaId) return;
     const fetchDiplomaData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('signed_diplomas')
-          .select('*')
-          .eq('blockchain_id', diplomaId)
-          .maybeSingle();
+        const { data, error } = await fetchPublicDiploma(diplomaId);
 
         if (error || !data) {
           console.error('Error fetching diploma:', error);
