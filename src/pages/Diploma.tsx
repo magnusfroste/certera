@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, QrCode, Shield } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
+import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -38,7 +37,7 @@ const getExplorerUrl = (seal: SealData | null) => {
 
 const Diploma = () => {
   const { diplomaId } = useParams();
-  const [diplomaData, setDiplomaData] = useState<Tables<'signed_diplomas'> | null>(null);
+  const [diplomaData, setDiplomaData] = useState<PublicDiploma | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -47,12 +46,8 @@ const Diploma = () => {
   useEffect(() => {
     if (!diplomaId) { setError('Diploma not found'); setIsLoading(false); return; }
     const fetchDiploma = async () => {
-      const { data, error: queryError } = await supabase
-        .from('signed_diplomas')
-        .select('*')
-        .eq('blockchain_id', diplomaId)
-        .maybeSingle();
-      if (queryError) setError(`Database error: ${queryError.message}`);
+      const { data, error: queryError } = await fetchPublicDiploma(diplomaId);
+      if (queryError) setError(`Database error: ${queryError}`);
       else if (!data) setError('Diploma not found');
       else setDiplomaData(data);
       setIsLoading(false);

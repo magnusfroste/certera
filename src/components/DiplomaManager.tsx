@@ -168,9 +168,15 @@ export const DiplomaManager = () => {
   const { data: signedDiplomas, isLoading, error } = useQuery({
     queryKey: ['signed-diplomas'],
     queryFn: async () => {
+      // "My diplomas": filter on the owner explicitly. Row-level security also
+      // limits ordinary users to their own rows, but an admin may read every
+      // row, and this list must never show other people's diplomas.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
       const { data, error } = await supabase
         .from('signed_diplomas')
         .select('id, blockchain_id, recipient_name, institution_name, verification_url, diploma_url, created_at')
+        .eq('issuer_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
