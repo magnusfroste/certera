@@ -14,6 +14,7 @@ import {
   type CustomProvider,
 } from "../_shared/customProviders.ts";
 import { GUEST_ACCESS_KEY, parseGuestDailyLimit } from "../_shared/guestAccess.ts";
+import { removeUnknownPlaceholders } from "../_shared/diplomaPlaceholders.ts";
 import { FALLBACK_POLICY_KEY, parseFallbackBudget, startOfUtcDay, estimatedSpendUsd, isPaidProvider, type UsageRow } from "../_shared/fallbackBudget.ts";
 
 // ── Shared request/DSL types ──
@@ -63,6 +64,8 @@ function contrastRatio(a: string, b: string): number | null {
 // Fixes that don't need the model: drop overrides that would produce
 // unreadable or mismatched designs, keep the curated palette instead.
 function applyDeterministicFixes(dsl: DiplomaDSL): void {
+  const removed = removeUnknownPlaceholders(dsl);
+  if (removed.length > 0) console.warn('Removed placeholders the app does not fill in:', removed);
   const palette = PALETTES[dsl.palette ?? ''] || PALETTES['ivory-navy'];
   // Foreground AA enforcement lives in the shared renderer. Never drop a
   // selected background to compensate for unreadable text.
@@ -183,6 +186,7 @@ DESIGN HEURISTIC:
 
 CONSTRAINTS:
 - body.recipientName MUST be exactly "{{recipient_name}}" (literal placeholder).
+- {{recipient_name}} is the ONLY placeholder. Write every other field as final text — no {{...}} anywhere else. Leave body.date out unless the user gives a date.
 - signature.name defaults to "Mr Diploma" unless user specifies.
 - Do NOT include customCss unless absolutely required.
 - Available palettes: ${PALETTE_IDS.join(', ')}.
