@@ -4,8 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save, Network, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkles, Save, Network, Info, Server } from 'lucide-react';
 import { toast } from 'sonner';
+import { CustomProvidersEditor } from '@/components/CustomProvidersEditor';
+import { DiplomaTestBench } from '@/components/DiplomaTestBench';
+import {
+  CUSTOM_PROVIDERS_KEY,
+  parseCustomProviders,
+  secretNameFor,
+  type CustomProvider,
+} from '../../supabase/functions/_shared/customProviders';
 
 interface IntegrationConfig {
   id: string;
@@ -13,8 +21,8 @@ interface IntegrationConfig {
   icon: React.ReactNode;
   description: string;
   secretName: string;
-  getKeyUrl: string;
-  getKeyInstructions: string;
+  getKeyUrl?: string;
+  getKeyInstructions?: string;
   supabaseSecretCommand: string;
   models: { value: string; label: string }[];
 }
@@ -104,6 +112,17 @@ const integrations: IntegrationConfig[] = [
   },
 ];
 
+/** A custom provider shown with the same card, test button and model picker as the built-ins. */
+const toIntegration = (c: CustomProvider): IntegrationConfig => ({
+  id: c.id,
+  name: c.label,
+  icon: <Server className="h-5 w-5" />,
+  description: `OpenAI-compatible endpoint · ${c.baseUrl}`,
+  secretName: secretNameFor(c.id),
+  supabaseSecretCommand: `supabase secrets set ${secretNameFor(c.id)}=your-key`,
+  models: c.models.map((m) => ({ value: m, label: m })),
+});
+
 interface TestResult {
   success: boolean;
   message: string;
@@ -119,12 +138,20 @@ const AdminIntegrations = () => {
   const [activeModel, setActiveModel] = useState('claude-sonnet-4-20250514');
   const [saving, setSaving] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
 
   useEffect(() => {
     loadSettings();
   }, []);
 
   const loadSettings = async () => {
+    const { data: custom } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', CUSTOM_PROVIDERS_KEY)
+      .maybeSingle();
+    setCustomProviders(parseCustomProviders(custom?.value));
+
     const { data, error } = await supabase
       .from('app_settings')
       .select('value')
@@ -187,7 +214,12 @@ const AdminIntegrations = () => {
     }
   };
 
-  const activeIntegration = integrations.find(i => i.id === activeProvider);
+  // Built-ins plus every custom provider. Only enabled custom providers can be
+  // made active or tested: generate-diploma ignores disabled ones.
+  const enabledCustom = customProviders.filter((c) => c.enabled).map(toIntegration);
+  const llmIntegrations = [...integrations.filter((i) => i.id !== 'firecrawl'), ...enabledCustom];
+  const allIntegrations = [...integrations, ...enabledCustom];
+  const activeIntegration = llmIntegrations.find(i => i.id === activeProvider);
 
   return (
     <div className="space-y-4">
@@ -207,14 +239,14 @@ const AdminIntegrations = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <Select value={activeProvider} onValueChange={(v) => {
                 setActiveProvider(v);
-                const integration = integrations.find(i => i.id === v);
+                const integration = llmIntegrations.find(i => i.id === v);
                 if (integration) setActiveModel(integration.models[0].value);
               }}>
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {integrations.filter(i => i.id !== 'firecrawl').map(i => (
+                  {llmIntegrations.map(i => (
                     <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -258,6 +290,11 @@ const AdminIntegrations = () => {
             <li><strong>Instruction following</strong> at GPT-4 / Claude 3.5 / Gemini 1.5+ level — smaller models often break the schema.</li>
             <li><strong>Vision input</strong> (optional) only if you want image-inspired generation.</li>
           </ul>
+          <p>
+            Custom providers are tried with a JSON schema first, then plain JSON mode, then free text, depending on what
+            the endpoint accepts. An answer that is not valid JSON counts as a failure, so visitors fall back to the next
+            provider. Use the test bench below to see how a model actually does.
+          </p>
           <p className="pt-1">Recommended: Claude Sonnet 4, GPT-4o, Gemini 2.5 Pro, or equivalent via OpenRouter.</p>
         </CardContent>
       </Card>
@@ -275,13 +312,27 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
 supabase secrets set OPENAI_API_KEY=sk-xxxxx
 supabase secrets set GEMINI_API_KEY=AIzaxxxxx
 supabase secrets set OPENROUTER_API_KEY=sk-or-xxxxx
-supabase secrets set FIRECRAWL_API_KEY=fc-xxxxx`}
+supabase secrets set FIRECRAWL_API_KEY=fc-xxxxx
+# Custom providers: LLM_<ID>_API_KEY, e.g.
+supabase secrets set LLM_GARAGEAI_API_KEY=xxxxx`}
           </pre>
         </CardContent>
       </Card>
 
+      <CustomProvidersEditor
+        providers={customProviders}
+        activeProvider={activeProvider}
+        onSaved={setCustomProviders}
+      />
+
+      <DiplomaTestBench
+        // Keyed so a newly added provider appears in the bench's pickers.
+        key={llmIntegrations.map((i) => i.id).join(',')}
+        providers={llmIntegrations.map((i) => ({ id: i.id, name: i.name, models: i.models.map((m) => m.value) }))}
+      />
+
       {/* Integration cards */}
-      {integrations.map(integration => {
+      {allIntegrations.map(integration => {
         const result = results[integration.id];
         const isTesting = testing === integration.id;
         const selectedModel = selectedModels[integration.id] || integration.models[0].value;
@@ -340,12 +391,16 @@ supabase secrets set FIRECRAWL_API_KEY=fc-xxxxx`}
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>Secret: <code className="bg-muted px-1 rounded">{integration.secretName}</code></span>
-                <span>·</span>
-                <a href={integration.getKeyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  Get API Key <ExternalLink className="h-3 w-3" />
-                </a>
+                {integration.getKeyUrl && (
+                  <>
+                    <span>·</span>
+                    <a href={integration.getKeyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                      Get API Key <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">{integration.getKeyInstructions}</p>
+              {integration.getKeyInstructions && <p className="text-xs text-muted-foreground">{integration.getKeyInstructions}</p>}
               <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">{integration.supabaseSecretCommand}</pre>
             </CardContent>
           </Card>
