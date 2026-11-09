@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_idempotency: {
+        Row: {
+          created_at: string
+          diploma_id: string | null
+          idem_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          diploma_id?: string | null
+          idem_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          diploma_id?: string | null
+          idem_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           created_at: string
