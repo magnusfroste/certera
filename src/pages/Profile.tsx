@@ -14,6 +14,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { DiplomaProvider } from '@/contexts/DiplomaContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { IssuerDomainCard } from '@/components/IssuerDomainCard';
+import { ApiKeysCard } from '@/components/ApiKeysCard';
 
 const ProfileContent = ({ user }: { user: SupabaseUser }) => {
   const { toast } = useToast();
@@ -120,6 +121,8 @@ const ProfileContent = ({ user }: { user: SupabaseUser }) => {
           </Card>
 
           <IssuerDomainCard />
+
+          <ApiKeysCard />
         </div>
       </main>
     </div>

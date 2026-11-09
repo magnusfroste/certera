@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { hederaConfig, parsePrivateKey } from "../_shared/hedera.ts";
+import { submitDiplomaToHedera } from "../_shared/hederaSubmit.ts";
 import { chooseIssuerDomain } from "../_shared/issuerDomain.ts";
 
 const corsHeaders = {
@@ -32,14 +32,6 @@ serve(async (req) => {
       });
     }
 
-    const hedera = hederaConfig();
-    const HEDERA_ACCOUNT_ID = hedera.accountId;
-    const HEDERA_PRIVATE_KEY = hedera.privateKey;
-
-    if (!HEDERA_ACCOUNT_ID || !HEDERA_PRIVATE_KEY) {
-      throw new Error('Hedera credentials not configured');
-    }
-
     const { contentHash, recipientName, institutionName, diplomaId } = await req.json();
 
     if (!contentHash || !recipientName || !institutionName || !diplomaId) {
@@ -56,74 +48,7 @@ serve(async (req) => {
       .select('domain').eq('user_id', user.id).not('verified_at', 'is', null).maybeSingle();
     const issuerDomain = chooseIssuerDomain(dnsRow?.domain, user.email, Boolean(user.email_confirmed_at));
 
-    // Build the HCS message payload
-    const hcsMessage = {
-      type: 'DIPLOMA_VERIFICATION',
-      version: '1.0',
-      diplomaId,
-      contentHash,
-      recipientNameHash: await sha256(recipientName), // Privacy: hash the name
-      institutionName,
-      issuerDomain,
-      timestamp: new Date().toISOString(),
-      issuerAccount: HEDERA_ACCOUNT_ID,
-    };
-
-    const messageBytes = new TextEncoder().encode(JSON.stringify(hcsMessage));
-
-    // Use Hedera SDK to submit HCS message
-    // Dynamic import to handle the SDK
-    const { Client, TopicMessageSubmitTransaction, TopicCreateTransaction, TopicId, PrivateKey } = 
-      await import("npm:@hashgraph/sdk@2.51.0");
-
-    const client = hedera.network === 'mainnet' ? Client.forMainnet() : Client.forTestnet();
-    
-    const privateKey = parsePrivateKey(PrivateKey, HEDERA_PRIVATE_KEY);
-
-    client.setOperator(HEDERA_ACCOUNT_ID, privateKey);
-
-    // Use a shared topic - stored as env var or create one
-    let topicId: string;
-    const HEDERA_TOPIC_ID = hedera.topicId;
-    
-    if (HEDERA_TOPIC_ID) {
-      topicId = HEDERA_TOPIC_ID;
-    } else {
-      // Create a new topic for diploma verification
-      console.log('Creating new HCS topic...');
-      const topicTx = await new TopicCreateTransaction()
-        .setTopicMemo('certera.ink - Diploma Verification')
-        .execute(client);
-      const topicReceipt = await topicTx.getReceipt(client);
-      topicId = topicReceipt.topicId!.toString();
-      console.log('Created HCS topic:', topicId);
-      // Note: Save this topic ID as a secret for future use
-    }
-
-    // Submit message to HCS
-    console.log('Submitting message to HCS topic:', topicId);
-    const submitTx = await new TopicMessageSubmitTransaction()
-      .setTopicId(TopicId.fromString(topicId))
-      .setMessage(messageBytes)
-      .execute(client);
-
-    const submitReceipt = await submitTx.getReceipt(client);
-    const sequenceNumber = submitReceipt.topicSequenceNumber?.toString() || '0';
-    const txId = submitTx.transactionId?.toString() || '';
-
-    console.log('HCS message submitted successfully');
-    console.log('Transaction ID:', txId);
-    console.log('Sequence Number:', sequenceNumber);
-
-    client.close();
-
-    const seal = {
-      hederaTxId: txId,
-      hederaTopicId: topicId,
-      hederaSequenceNumber: sequenceNumber,
-      hederaExplorerUrl: `${hedera.explorerBase}/topic/${topicId}`,
-      hederaTxExplorerUrl: `${hedera.explorerBase}/transaction/${txId}`,
-    };
+    const seal = await submitDiplomaToHedera({ diplomaId, contentHash, recipientName, institutionName, issuerDomain });
 
     // Record the signature server-side; signed_diplomas only accepts rows that match it
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -138,12 +63,12 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      transactionId: txId,
-      topicId,
-      sequenceNumber,
+      transactionId: seal.hederaTxId,
+      topicId: seal.hederaTopicId,
+      sequenceNumber: seal.hederaSequenceNumber,
       consensusTimestamp: new Date().toISOString(),
-      explorerUrl: `${hedera.explorerBase}/topic/${topicId}`,
-      txExplorerUrl: `${hedera.explorerBase}/transaction/${txId}`,
+      explorerUrl: seal.hederaExplorerUrl,
+      txExplorerUrl: seal.hederaTxExplorerUrl,
       issuerDomain,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -160,11 +85,3 @@ serve(async (req) => {
     });
   }
 });
-
-async function sha256(data: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const dataBuffer = encoder.encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
