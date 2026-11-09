@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ChatLanding } from "@/components/ChatLanding";
 import { PreviewPanel } from "@/components/PreviewPanel";
@@ -26,7 +26,20 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
   guestAccess: ReturnType<typeof useGuestAccess>;
 }) => {
   const { messages, diplomaHtml } = useDiploma();
-  useGuestDraft(isGuest, !!user);
+  // A session picked in the sidebar on another page (/profile, /signed) arrives
+  // as ?session=<id>; open it, then drop the parameter. A guest draft is not
+  // adopted on such a visit, so it can never land on top of the chosen session.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { loadSession } = useDiploma();
+  const requestedSession = !isGuest ? new URLSearchParams(location.search).get('session') : null;
+  useEffect(() => {
+    if (!requestedSession) return;
+    loadSession(requestedSession);
+    navigate('/app', { replace: true });
+  }, [requestedSession, loadSession, navigate]);
+  const openedASession = useRef(!!requestedSession);
+  useGuestDraft(isGuest, !!user && !openedASession.current);
   const hasStarted = messages.some(m => m.isUser);
   const hasCanvas = !!diplomaHtml;
   const isMobile = useIsMobile();
