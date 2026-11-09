@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Users, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Users, Loader2, CheckCircle, XCircle, AlertCircle, Copy, Download, ExternalLink } from 'lucide-react';
 import { signDiplomaToBlockchain } from '@/services/blockchainService';
 import { toast } from 'sonner';
 import { personalizeHtml } from '@/lib/recipient';
@@ -27,8 +27,16 @@ interface BulkSignDialogProps {
 interface SignResult {
   name: string;
   success: boolean;
+  /** Public diploma page — what the issuer sends to the recipient. */
+  url?: string;
   error?: string;
 }
+
+/** One quoted CSV field (RFC 4180), with spreadsheet formula injection neutralised. */
+const csvField = (v: string) => {
+  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
 
 export const BulkSignDialog = ({
   open,
@@ -74,13 +82,13 @@ export const BulkSignDialog = ({
         // Replace recipient name placeholder in HTML if present
         const personalizedHtml = personalizeHtml(diplomaHtml, name);
 
-        await signDiplomaToBlockchain(
+        const record = await signDiplomaToBlockchain(
           personalizedHtml,
           diplomaCss,
           name,
           institutionName
         );
-        allResults.push({ name, success: true });
+        allResults.push({ name, success: true, url: record.diplomaUrl });
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
         allResults.push({ name, success: false, error: msg });
@@ -102,6 +110,30 @@ export const BulkSignDialog = ({
     } else {
       toast.warning(`${succeeded} signed, ${failed} failed`);
     }
+  };
+
+  const signed = results.filter((r) => r.success && r.url);
+
+  // After signing, the issuer's next job is handing each person their link.
+  const copyAllLinks = async () => {
+    const text = signed.map((r) => `${r.name}\t${r.url}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Copied ${signed.length} link${signed.length !== 1 ? 's' : ''}`);
+    } catch {
+      toast.error('Could not copy — use Download CSV instead');
+    }
+  };
+
+  const downloadCsv = () => {
+    const rows = [['Name', 'Diploma link'], ...signed.map((r) => [r.name, r.url!])];
+    const csv = '\uFEFF' + rows.map((row) => row.map(csvField).join(',')).join('\r\n');
+    const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = `${institutionName.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'diplomas'}-links.csv`;
+    a.click();
+    URL.revokeObjectURL(href);
   };
 
   const handleClose = () => {
@@ -188,7 +220,18 @@ export const BulkSignDialog = ({
                 ) : (
                   <XCircle className="w-4 h-4 text-destructive shrink-0" />
                 )}
-                <span className="flex-1">{r.name}</span>
+                <span className="flex-1 min-w-0 truncate">{r.name}</span>
+                {r.success && r.url && (
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                    aria-label={`Open the diploma for ${r.name}`}
+                  >
+                    Open <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
                 {!r.success && (
                   <span className="text-xs text-destructive truncate max-w-[200px]">
                     {r.error}
@@ -219,9 +262,21 @@ export const BulkSignDialog = ({
               )}
             </Button>
           ) : (
-            <Button onClick={handleClose} className="w-full">
-              Done
-            </Button>
+            <div className="w-full space-y-2">
+              {signed.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={copyAllLinks}>
+                    <Copy className="w-4 h-4 mr-2" />Copy all links
+                  </Button>
+                  <Button variant="outline" onClick={downloadCsv}>
+                    <Download className="w-4 h-4 mr-2" />Download CSV
+                  </Button>
+                </div>
+              )}
+              <Button onClick={handleClose} className="w-full">
+                Done
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
