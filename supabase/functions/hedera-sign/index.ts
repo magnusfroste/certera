@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hederaConfig, parsePrivateKey } from "../_shared/hedera.ts";
-import { issuerDomainFromEmail } from "../_shared/issuerDomain.ts";
+import { chooseIssuerDomain } from "../_shared/issuerDomain.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,9 +46,15 @@ serve(async (req) => {
       throw new Error('Missing required fields: contentHash, recipientName, institutionName, diplomaId');
     }
 
-    // The organisation email domain behind this signature, from the verified
-    // account — never from the request body. Null for personal mail providers.
-    const issuerDomain = issuerDomainFromEmail(user.email, Boolean(user.email_confirmed_at));
+    // The organisation domain behind this signature, from the verified account —
+    // never from the request body. Null when there is none (personal email, no
+    // DNS-verified domain).
+    // A domain proven with a DNS record (issuer-domain function) wins over the
+    // email's: verifying one is an explicit choice to issue as that organisation.
+    const lookupAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: dnsRow } = await lookupAdmin.from('issuer_domains')
+      .select('domain').eq('user_id', user.id).not('verified_at', 'is', null).maybeSingle();
+    const issuerDomain = chooseIssuerDomain(dnsRow?.domain, user.email, Boolean(user.email_confirmed_at));
 
     // Build the HCS message payload
     const hcsMessage = {
