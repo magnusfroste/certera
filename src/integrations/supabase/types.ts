@@ -139,26 +139,26 @@ export type Database = {
       }
       hedera_signatures: {
         Row: {
-          issuer_domain: string | null
           content_hash: string
           created_at: string
           diploma_id: string
+          issuer_domain: string | null
           issuer_id: string
           seal: Json
         }
         Insert: {
-          issuer_domain?: string | null
           content_hash: string
           created_at?: string
           diploma_id: string
+          issuer_domain?: string | null
           issuer_id: string
           seal: Json
         }
         Update: {
-          issuer_domain?: string | null
           content_hash?: string
           created_at?: string
           diploma_id?: string
+          issuer_domain?: string | null
           issuer_id?: string
           seal?: Json
         }
@@ -280,7 +280,6 @@ export type Database = {
       }
       signed_diplomas: {
         Row: {
-          issuer_domain: string | null
           blockchain_id: string
           content_hash: string
           created_at: string
@@ -290,6 +289,7 @@ export type Database = {
           diplomator_seal: string
           id: string
           institution_name: string
+          issuer_domain: string | null
           issuer_id: string
           recipient_name: string
           signature: string
@@ -297,7 +297,6 @@ export type Database = {
           verification_url: string
         }
         Insert: {
-          issuer_domain?: string | null
           blockchain_id: string
           content_hash: string
           created_at?: string
@@ -307,6 +306,7 @@ export type Database = {
           diplomator_seal: string
           id?: string
           institution_name: string
+          issuer_domain?: string | null
           issuer_id: string
           recipient_name: string
           signature: string
@@ -314,7 +314,6 @@ export type Database = {
           verification_url: string
         }
         Update: {
-          issuer_domain?: string | null
           blockchain_id?: string
           content_hash?: string
           created_at?: string
@@ -324,6 +323,7 @@ export type Database = {
           diplomator_seal?: string
           id?: string
           institution_name?: string
+          issuer_domain?: string | null
           issuer_id?: string
           recipient_name?: string
           signature?: string
@@ -384,7 +384,7 @@ export type Database = {
           diploma_url: string
           diplomator_seal: string
           institution_name: string
-          issuer_domain: string | null
+          issuer_domain: string
           recipient_name: string
         }[]
       }
