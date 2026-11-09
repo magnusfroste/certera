@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Award, Mail, Lock, ArrowLeft, User } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { oauthReturnPath } from '@/lib/oauth-return-path';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +16,8 @@ const Auth = () => {
   // "Create account" buttons link here with ?mode=signup.
   const initialTab = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
   const { toast } = useToast();
+  const nextParam = searchParams.get('next');
+  const returnTo = nextParam ? oauthReturnPath(nextParam) : '/app';
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,17 +25,17 @@ const Auth = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/app');
+      if (session) navigate(returnTo);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (session) navigate('/app');
+        if (session) navigate(returnTo);
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, returnTo]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,10 +46,11 @@ const Auth = () => {
         email,
         password,
         options: {
-          // Back to the studio after confirming, where a design made as a
-          // guest is waiting (src/lib/guestDraft.ts). Must be in Supabase's
-          // allowed redirect URLs, otherwise the Site URL is used.
-          emailRedirectTo: `${window.location.origin}/app`,
+          // Back to where sign-up started: the studio by default, where a
+          // design made as a guest is waiting (src/lib/guestDraft.ts), or the
+          // ?next= page (e.g. the MCP consent screen). www.certera.ink/** is an
+          // allowed redirect URL in Supabase Auth.
+          emailRedirectTo: new URL(returnTo, window.location.origin).href,
           data: {
             name: name.trim() || email.split('@')[0],
           }

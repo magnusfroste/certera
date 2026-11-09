@@ -39,6 +39,7 @@ const PUBLIC: Record<string, Omit<RouteMeta, 'canonical' | 'noindex'>> = {
 
 const PRIVATE: { match: (p: string) => boolean; title: string }[] = [
   { match: (p) => p === '/auth', title: 'Sign in or create an account' + SUFFIX },
+  { match: (p) => p.startsWith('/.lovable/'), title: 'Connect an app' + SUFFIX },
   { match: (p) => p === '/app', title: 'Studio' + SUFFIX },
   { match: (p) => p === '/profile', title: 'Profile' + SUFFIX },
   { match: (p) => p === '/signed', title: 'Signed diplomas' + SUFFIX },

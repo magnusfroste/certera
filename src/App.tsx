@@ -29,6 +29,7 @@ function lazyRetry<T>(importFn: () => Promise<T>, retries = 3, delay = 1500): Pr
 }
 
 const Auth = lazy(() => lazyRetry(() => import("./pages/Auth")));
+const OAuthConsent = lazy(() => lazyRetry(() => import("./pages/OAuthConsent")));
 const Index = lazy(() => lazyRetry(() => import("./pages/Index")));
 const Profile = lazy(() => lazyRetry(() => import("./pages/Profile")));
 const Signed = lazy(() => lazyRetry(() => import("./pages/Signed")));
@@ -90,6 +91,7 @@ const App = () => {
                 <Route path="/" element={<Landing />} />
                 <Route path="/health" element={<HealthCheck />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 <Route path="/app" element={<Index />} />
                 <Route path="/demo" element={<Index />} />
                 <Route path="/profile" element={<Profile />} />

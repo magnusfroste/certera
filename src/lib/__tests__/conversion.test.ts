@@ -57,7 +57,7 @@ describe('route metadata', () => {
   });
 
   it('keeps personal, private and unknown pages out of the index', () => {
-    for (const p of ['/app', '/auth', '/profile', '/signed', '/admin', '/admin/dsl', '/diploma/DIP_x', '/embed/DIP_x', '/verify/DIP_x', '/health']) {
+    for (const p of ['/app', '/auth', '/profile', '/signed', '/admin', '/admin/dsl', '/diploma/DIP_x', '/embed/DIP_x', '/verify/DIP_x', '/health', '/.lovable/oauth/consent']) {
       expect(metaForPath(p).noindex, p).toBe(true);
     }
     expect(metaForPath('/kontakt')).toMatchObject({ noindex: true, title: expect.stringContaining('not found') });
