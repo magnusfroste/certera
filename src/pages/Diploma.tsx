@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
 import { Link, useParams } from 'react-router-dom';
 import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, QrCode, Shield } from 'lucide-react';
 import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
@@ -90,9 +91,12 @@ const Diploma = () => {
   return (
     <div className="min-h-screen bg-muted text-foreground">
       <header className="border-b bg-background/95 px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center gap-2">
-          <Award className="h-5 w-5 text-primary" />
-          <Link to="/" className="font-semibold">certera.ink</Link>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Award className="h-5 w-5 text-primary" />
+            <Link to="/" className="font-semibold">certera.ink</Link>
+          </div>
+          <Button variant="outline" size="sm" asChild><Link to="/demo?ref=diploma">Create your own</Link></Button>
         </div>
       </header>
 
@@ -156,6 +160,8 @@ const Diploma = () => {
               <Button variant="outline" size="sm" asChild><a href={diplomaData.diploma_url} download><Download />Download</a></Button>
             )}
           </div>
+
+          <MakeYourOwnCta from="diploma" />
         </section>
       </main>
     </div>

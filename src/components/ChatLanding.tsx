@@ -60,7 +60,7 @@ export const ChatLanding = ({ isGuest, guestAccess }: ChatLandingProps) => {
                 : `You've used your ${guestAccess!.maxGenerations} free diploma${guestAccess!.maxGenerations === 1 ? '' : 's'} for today. Create a free account to keep going — and to save, sign and share your diplomas.`}
             </p>
             <Button asChild size="sm">
-              <Link to="/auth">Create free account</Link>
+              <Link to="/auth?mode=signup">Create free account</Link>
             </Button>
           </div>
         )}

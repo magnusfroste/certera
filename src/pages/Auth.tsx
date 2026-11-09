@@ -5,12 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Award, Mail, Lock, ArrowLeft, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // "Create account" buttons link here with ?mode=signup.
+  const initialTab = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -40,6 +43,10 @@ const Auth = () => {
         email,
         password,
         options: {
+          // Back to the studio after confirming, where a design made as a
+          // guest is waiting (src/lib/guestDraft.ts). Must be in Supabase's
+          // allowed redirect URLs, otherwise the Site URL is used.
+          emailRedirectTo: `${window.location.origin}/app`,
           data: {
             name: name.trim() || email.split('@')[0],
           }
@@ -50,7 +57,7 @@ const Auth = () => {
 
       toast({
         title: "Check your email",
-        description: "We've sent you a confirmation link to complete your registration.",
+        description: "We've sent you a confirmation link. Anything you designed in the demo will be waiting in your studio.",
       });
     } catch (error) {
       toast({
@@ -111,7 +118,7 @@ const Auth = () => {
 
         {/* Auth Card */}
         <div className="border border-border rounded-2xl bg-card p-6">
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>

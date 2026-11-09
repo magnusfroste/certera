@@ -17,6 +17,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { cleanSource } from "../_shared/campaignSource.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -130,6 +131,7 @@ serve(async (req: Request) => {
     const { error } = await admin().from('page_views').insert({
       path,
       referrer_host: referrerHost(body.referrer),
+      source: cleanSource(body.source),
       device: deviceOf(ua),
       country: countryOf(req),
       visitor_hash: visitorHash,

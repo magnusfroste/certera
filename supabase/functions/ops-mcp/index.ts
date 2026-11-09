@@ -669,7 +669,7 @@ const TOOLS: Record<string, ToolDef> = {
 
   get_traffic: {
     description:
-      'Site traffic from first-party, cookieless measurement: page views and visitors per day, how many got past the landing page and into the product, top pages, referrers, devices and countries. Crawlers are excluded by default and reported separately. Measurement starts when the track function was deployed — older history exists only in Lovable analytics.',
+      'Site traffic from first-party, cookieless measurement: page views and visitors per day, how many got past the landing page and into the product, top pages, referrers, the funnel per campaign tag (?utm_source/?ref), devices and countries. Crawlers are excluded by default and reported separately. Measurement starts when the track function was deployed — older history exists only in Lovable analytics.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -683,13 +683,13 @@ const TOOLS: Record<string, ToolDef> = {
 
       // PostgREST caps a response at 1000 rows, so page through; without this
       // the tool would silently under-report as soon as traffic grew.
-      type View = { created_at: string; path: string; referrer_host: string | null; device: string; country: string | null; visitor_hash: string; is_bot: boolean };
+      type View = { created_at: string; path: string; referrer_host: string | null; source: string | null; device: string; country: string | null; visitor_hash: string; is_bot: boolean };
       const rows: View[] = [];
       const pageSize = 1000;
       for (let from = 0; from < 50_000; from += pageSize) {
         const { data, error } = await admin()
           .from('page_views')
-          .select('created_at, path, referrer_host, device, country, visitor_hash, is_bot')
+          .select('created_at, path, referrer_host, source, device, country, visitor_hash, is_bot')
           .gte('created_at', sinceIso(days))
           .order('created_at', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -713,6 +713,8 @@ const TOOLS: Record<string, ToolDef> = {
       // Per visitor-day: which paths they reached, to see if anyone gets past
       // the landing page.
       const journeys = new Map<string, Set<string>>();
+      // First campaign tag / referrer seen per visitor-day, for the funnel by source.
+      const origins = new Map<string, string>();
       const tally = (m: Map<string, number>, k: string | null) => { if (k) m.set(k, (m.get(k) ?? 0) + 1); };
       const paths = new Map<string, number>(), refs = new Map<string, number>();
       const devices = new Map<string, number>(), countries = new Map<string, number>();
@@ -724,6 +726,7 @@ const TOOLS: Record<string, ToolDef> = {
         const key = `${day}|${r.visitor_hash}`;
         if (!journeys.has(key)) journeys.set(key, new Set());
         journeys.get(key)!.add(r.path);
+        if (!origins.has(key) && (r.source || r.referrer_host)) origins.set(key, r.source ?? `ref:${r.referrer_host}`);
         tally(paths, r.path); tally(refs, r.referrer_host);
         tally(devices, r.device); tally(countries, r.country);
       }
@@ -756,6 +759,19 @@ const TOOLS: Record<string, ToolDef> = {
         byDay: [...byDay].map(([date, v]) => ({ date, pageviews: v.pageviews, visitors: v.visitors.size })),
         topPaths: top(paths),
         topReferrers: top(refs),
+        // Funnel per campaign tag (?utm_source / ?ref) or, failing that, referrer host.
+        funnelBySource: (() => {
+          const m = new Map<string, { visitorDays: number; openedDemoOrApp: number; reachedSignUp: number }>();
+          for (const [key, ps] of journeys) {
+            const src = origins.get(key) ?? '(direct)';
+            const e = m.get(src) ?? { visitorDays: 0, openedDemoOrApp: 0, reachedSignUp: 0 };
+            e.visitorDays++;
+            if ([...ps].some((p) => /^\/(demo|app)$/.test(p))) e.openedDemoOrApp++;
+            if (ps.has('/auth')) e.reachedSignUp++;
+            m.set(src, e);
+          }
+          return [...m].sort((a, b) => b[1].visitorDays - a[1].visitorDays).slice(0, 15).map(([source, v]) => ({ source, ...v }));
+        })(),
         devices: top(devices),
         countries: top(countries),
       };
