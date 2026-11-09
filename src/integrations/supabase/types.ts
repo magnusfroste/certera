@@ -182,6 +182,33 @@ export type Database = {
         }
         Relationships: []
       }
+      issuer_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          last_checked_at: string | null
+          token: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          last_checked_at?: string | null
+          token: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          last_checked_at?: string | null
+          token?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       ops_tokens: {
         Row: {
           created_at: string
@@ -212,33 +239,6 @@ export type Database = {
           prefix?: string
           revoked_at?: string | null
           token_hash?: string
-        }
-        Relationships: []
-      }
-      issuer_domains: {
-        Row: {
-          created_at: string
-          domain: string
-          last_checked_at: string | null
-          token: string
-          user_id: string
-          verified_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          domain: string
-          last_checked_at?: string | null
-          token: string
-          user_id: string
-          verified_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          domain?: string
-          last_checked_at?: string | null
-          token?: string
-          user_id?: string
-          verified_at?: string | null
         }
         Relationships: []
       }
