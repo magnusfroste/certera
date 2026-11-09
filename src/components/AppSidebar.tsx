@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Settings, LogOut, User, Award, PanelLeftClose, PanelLeft, ShieldCheck, Trash2 } from 'lucide-react';
 
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDiploma } from '@/contexts/DiplomaContext';
@@ -88,6 +88,11 @@ function groupByDate(sessions: DiplomaSession[]) {
 
 export function AppSidebar({ userEmail, userName }: AppSidebarProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // The sidebar is also shown on /profile and /signed, whose DiplomaProvider is
+  // not the studio's: there, resetting or loading a session changes nothing on
+  // screen. Go to the studio instead (a fresh studio is a new diploma).
+  const inStudio = pathname === '/app';
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === 'collapsed';
   const { currentSessionId, loadSession, resetSession } = useDiploma();
@@ -129,11 +134,13 @@ export function AppSidebar({ userEmail, userName }: AppSidebarProps) {
   };
 
   const handleNewDiploma = () => {
-    resetSession();
+    if (inStudio) resetSession();
+    else navigate('/app');
   };
 
   const handleSelectSession = (id: string) => {
-    loadSession(id);
+    if (inStudio) loadSession(id);
+    else navigate(`/app?session=${encodeURIComponent(id)}`);
   };
 
   const handleLogout = async () => {
