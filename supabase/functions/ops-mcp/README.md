@@ -69,9 +69,10 @@ makes the key check the *only* gate — treat keys as production credentials.
 | `set_guest_limit` | **Write.** How many diplomas a visitor may generate per day without an account (0 = account required). Same setting as /admin → Users & Roles → Guest access. |
 | `check_providers` | Live provider health — the credit alarm. See below. |
 | `get_settings` | Current `app_settings` key/value configuration. |
-| `get_token_usage` | Tokens and estimated cost per day and per provider/model, including spend wasted on failed calls and fallback. |
+| `get_token_usage` | Tokens and estimated cost per day and per provider/model, including spend wasted on failed calls and fallback, and today's paid-fallback spend against the cap (`fallbackToday`). |
 | `list_models` | Providers and models the app can use, their estimated prices, which key is configured, and what is active now. |
 | `set_ai_provider` | **Write.** Switch the provider/model used for all generations. |
+| `set_fallback_budget` | **Write.** Daily USD cap on the paid fallback when the active provider fails (0 = best effort: no paid fallback, visitors see "busy, try again"; `null` = no cap). Same setting as /admin → Integrations → Paid fallback. |
 
 ## Traffic
 

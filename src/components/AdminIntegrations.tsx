@@ -8,6 +8,7 @@ import { CheckCircle, XCircle, Loader2, ExternalLink, Zap, Globe, Brain, Sparkle
 import { toast } from 'sonner';
 import { CustomProvidersEditor } from '@/components/CustomProvidersEditor';
 import { DiplomaTestBench } from '@/components/DiplomaTestBench';
+import { AdminFallbackBudget } from '@/components/AdminFallbackBudget';
 import {
   CUSTOM_PROVIDERS_KEY,
   parseCustomProviders,
@@ -273,6 +274,8 @@ const AdminIntegrations = () => {
           )}
         </CardContent>
       </Card>
+
+      <AdminFallbackBudget />
 
       {/* Model requirements */}
       <Card className="border-dashed bg-muted/30">

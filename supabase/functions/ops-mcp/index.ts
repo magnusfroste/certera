@@ -31,9 +31,35 @@ import {
   CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat, ProviderHttpError,
   type CustomProvider,
 } from "../_shared/customProviders.ts";
+import { CATALOGUE, PROVIDERS, priceFor, estimateCost } from "../_shared/pricing.ts";
 import {
   GUEST_ACCESS_KEY, MAX_GUEST_DAILY_LIMIT, isValidGuestDailyLimit, parseGuestDailyLimit,
 } from "../_shared/guestAccess.ts";
+import {
+  FALLBACK_POLICY_KEY, MAX_FALLBACK_BUDGET_USD, isValidFallbackBudget, parseFallbackBudget, startOfUtcDay, estimatedSpendUsd,
+  type UsageRow,
+} from "../_shared/fallbackBudget.ts";
+
+/** Today's paid-reserve state, the same numbers generate-diploma decides on. */
+async function fallbackToday() {
+  const { data: setting } = await admin().from('app_settings').select('value').eq('key', FALLBACK_POLICY_KEY).maybeSingle();
+  const dailyBudgetUsd = parseFallbackBudget(setting?.value);
+  const { data, error } = await admin()
+    .from('generation_usage')
+    .select('provider, model, input_tokens, output_tokens')
+    .eq('fell_back', true)
+    .gte('created_at', startOfUtcDay());
+  if (error) throw new Error(error.message);
+  const spent = Math.round(estimatedSpendUsd((data ?? []) as UsageRow[]) * 10000) / 10000;
+  return {
+    dailyBudgetUsd,
+    mode: dailyBudgetUsd === null ? 'no cap' : dailyBudgetUsd === 0 ? 'best effort (no paid fallback)' : 'capped',
+    fallbackCallsToday: (data ?? []).length,
+    estimatedFallbackSpendTodayUsd: spent,
+    paidFallbackOpen: dailyBudgetUsd === null || spent < dailyBudgetUsd,
+    resetsAt: new Date(new Date(startOfUtcDay()).getTime() + DAY_MS).toISOString(),
+  };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -428,40 +454,6 @@ async function probeModel(provider: string, model: string): Promise<{ ok: boolea
 // not a billing source — providers change them, so cost figures are labelled
 // "estimated" everywhere they surface.
 
-interface ModelInfo { id: string; label: string; inputPer1M: number; outputPer1M: number }
-
-const CATALOGUE: Record<string, ModelInfo[]> = {
-  anthropic: [
-    { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', inputPer1M: 3, outputPer1M: 15 },
-    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', inputPer1M: 1, outputPer1M: 5 },
-  ],
-  openai: [
-    { id: 'gpt-4o', label: 'GPT-4o', inputPer1M: 2.5, outputPer1M: 10 },
-    { id: 'gpt-4o-mini', label: 'GPT-4o mini', inputPer1M: 0.15, outputPer1M: 0.6 },
-  ],
-  gemini: [
-    { id: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash', inputPer1M: 0.3, outputPer1M: 2.5 },
-  ],
-  openrouter: [
-    { id: 'openai/gpt-4o', label: 'GPT-4o (via OpenRouter)', inputPer1M: 2.5, outputPer1M: 10 },
-    { id: 'openai/gpt-4o-mini', label: 'GPT-4o mini (via OpenRouter)', inputPer1M: 0.15, outputPer1M: 0.6 },
-    { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 (via OpenRouter)', inputPer1M: 3, outputPer1M: 15 },
-  ],
-};
-
-const PROVIDERS = Object.keys(CATALOGUE);
-
-function priceFor(provider: string, model: string): ModelInfo | undefined {
-  return CATALOGUE[provider]?.find((m) => m.id === model);
-}
-
-/** Estimated USD for a token count, or null when the model isn't priced here. */
-function estimateCost(provider: string, model: string, input: number, output: number): number | null {
-  const p = priceFor(provider, model);
-  if (!p) return null;
-  return (input / 1_000_000) * p.inputPer1M + (output / 1_000_000) * p.outputPer1M;
-}
-
 // ---------------------------------------------------------------------------
 // Tools
 // ---------------------------------------------------------------------------
@@ -648,6 +640,33 @@ const TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  set_fallback_budget: {
+    description:
+      `Daily cap (USD, UTC day) on what the paid fallback may cost when the active provider fails. WRITE — applies to the next request. 0 = best effort: never fall back to a paid provider, visitors get "busy, try again" instead. null removes the cap. Maximum ${MAX_FALLBACK_BUDGET_USD}. The active provider and custom (own) providers are never capped.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        daily_budget_usd: { type: ['number', 'null'], description: `0-${MAX_FALLBACK_BUDGET_USD}, or null for no cap.` },
+      },
+      required: ['daily_budget_usd'],
+    },
+    handler: async (args) => {
+      const raw = args.daily_budget_usd;
+      if (raw !== null && !isValidFallbackBudget(raw)) {
+        throw new Error(`daily_budget_usd must be a number from 0 to ${MAX_FALLBACK_BUDGET_USD}, or null.`);
+      }
+      const { data: before } = await admin().from('app_settings').select('value').eq('key', FALLBACK_POLICY_KEY).maybeSingle();
+      const dailyBudgetUsd = raw === null ? null : Math.round((raw as number) * 100) / 100;
+      const { data: saved, error } = await admin()
+        .from('app_settings')
+        .upsert({ key: FALLBACK_POLICY_KEY, value: { dailyBudgetUsd }, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .select('value');
+      if (error) throw new Error(`Save failed: ${error.message}`);
+      if (!saved || saved.length === 0) throw new Error('Save failed: nothing was written.');
+      return { previous: parseFallbackBudget(before?.value), ...(await fallbackToday()) };
+    },
+  },
+
   get_traffic: {
     description:
       'Site traffic from first-party, cookieless measurement: page views and visitors per day, how many got past the landing page and into the product, top pages, referrers, devices and countries. Crawlers are excluded by default and reported separately. Measurement starts when the track function was deployed — older history exists only in Lovable analytics.',
@@ -805,7 +824,7 @@ const TOOLS: Record<string, ToolDef> = {
 
   get_token_usage: {
     description:
-      'Token consumption and estimated cost over the last N days (default 30), broken down by day and by provider/model. Also reports tokens burned by failed calls and by fallback, i.e. spend caused by outages.',
+      'Token consumption and estimated cost over the last N days (default 30), broken down by day and by provider/model. Also reports tokens burned by failed calls and by fallback, i.e. spend caused by outages, and the paid-fallback spend so far today against the daily cap (fallbackToday).',
     inputSchema: {
       type: 'object',
       properties: { days: { type: 'number', description: 'Look-back window, 1-90 (default 30)' } },
@@ -862,6 +881,7 @@ const TOOLS: Record<string, ToolDef> = {
       return {
         days,
         totals: { ...totals, estimatedCostUsd: round(totals.estimatedCostUsd) },
+        fallbackToday: await fallbackToday(),
         costNote:
           unpriced > 0
             ? `${unpriced} call(s) used a model with no price in the catalogue and contribute 0 to the cost estimate.`
