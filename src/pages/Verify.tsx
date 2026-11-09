@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
+import { IssuerStamp } from '@/components/IssuerStamp';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Building, CheckCircle2, ExternalLink, Hash, Home, Search, Shield, User, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,7 +51,7 @@ const VerificationResult = ({ result, loading }: { result: VerifyResult | null; 
         </div>
         <div className="space-y-4 border-t pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
           <div><p className="text-xs uppercase text-muted-foreground">Recipient</p><p className="mt-1 flex items-center gap-2 font-medium"><User className="h-4 w-4 text-muted-foreground" />{result.record.recipient_name}</p></div>
-          <div><p className="text-xs uppercase text-muted-foreground">Issuer</p><p className="mt-1 flex items-center gap-2"><Building className="h-4 w-4 text-muted-foreground" />{result.record.institution_name}</p></div>
+          <div><p className="text-xs uppercase text-muted-foreground">Issuer</p><p className="mt-1 flex items-center gap-2"><Building className="h-4 w-4 text-muted-foreground" />{result.record.institution_name}</p><div className="mt-2"><IssuerStamp domain={result.record.issuer_domain} institution={result.record.institution_name} /></div></div>
           <div><p className="text-xs uppercase text-muted-foreground">Issued</p><p className="mt-1">{formatDate(result.record.created_at, result.record.diploma_html)}</p></div>
           {result.hcs?.explorerUrl && <Button variant="outline" size="sm" asChild><a href={result.hcs.explorerUrl} target="_blank" rel="noreferrer"><ExternalLink />View on HashScan</a></Button>}
           <Button size="sm" asChild><Link to={`/diploma/${result.record.blockchain_id}`}>View diploma</Link></Button>

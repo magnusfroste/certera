@@ -1,8 +1,10 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, CheckCircle, ExternalLink, Loader2, Users } from 'lucide-react';
+import { Shield, CheckCircle, ExternalLink, Loader2, Users, BadgeCheck, CircleHelp } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { issuerDomainFromEmail } from '../../supabase/functions/_shared/issuerDomain';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { signDiplomaToBlockchain, DiplomaRecord } from '@/services/blockchainService';
 import { toast } from 'sonner';
@@ -13,6 +15,14 @@ import { useSignedDiploma } from '@/hooks/useSignedDiploma';
 const SharePanel = lazy(() => import('@/components/SharePanel').then(m => ({ default: m.SharePanel }))); 
 
 export const BlockchainSigner = () => {
+  // What the signed diplomas will say about the issuer (decided server-side by
+  // hedera-sign from the same rule) — shown before signing, not discovered after.
+  const [issuer, setIssuer] = useState<{ domain: string | null; email: string } | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setIssuer({ email: user.email, domain: issuerDomainFromEmail(user.email, Boolean(user.email_confirmed_at)) });
+    });
+  }, []);
   const { 
     diplomaHtml, 
     diplomaCss,
@@ -76,6 +86,17 @@ export const BlockchainSigner = () => {
                 <Input id="institution" value={signingInstitutionName}
                   onChange={(e) => setSigningInstitutionName(e.target.value)}
                   placeholder="Enter institution name" disabled={isSigningTx} />
+                {issuer && (issuer.domain ? (
+                  <p className="flex items-start gap-1.5 text-xs text-muted-foreground leading-relaxed">
+                    <BadgeCheck className="mt-px h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
+                    <span>Your diplomas will carry a <span className="text-foreground font-medium">Verified issuer · {issuer.domain}</span> stamp.</span>
+                  </p>
+                ) : (
+                  <p className="flex items-start gap-1.5 text-xs text-muted-foreground leading-relaxed">
+                    <CircleHelp className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>You are signed in with a personal address, so diplomas will show the issuer as not verified. Sign up with your work email to get a <span className="text-foreground font-medium">Verified issuer</span> stamp.</span>
+                  </p>
+                ))}
               </div>
             </div>
 

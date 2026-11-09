@@ -139,6 +139,7 @@ export type Database = {
       }
       hedera_signatures: {
         Row: {
+          issuer_domain: string | null
           content_hash: string
           created_at: string
           diploma_id: string
@@ -146,6 +147,7 @@ export type Database = {
           seal: Json
         }
         Insert: {
+          issuer_domain?: string | null
           content_hash: string
           created_at?: string
           diploma_id: string
@@ -153,6 +155,7 @@ export type Database = {
           seal: Json
         }
         Update: {
+          issuer_domain?: string | null
           content_hash?: string
           created_at?: string
           diploma_id?: string
@@ -277,6 +280,7 @@ export type Database = {
       }
       signed_diplomas: {
         Row: {
+          issuer_domain: string | null
           blockchain_id: string
           content_hash: string
           created_at: string
@@ -293,6 +297,7 @@ export type Database = {
           verification_url: string
         }
         Insert: {
+          issuer_domain?: string | null
           blockchain_id: string
           content_hash: string
           created_at?: string
@@ -309,6 +314,7 @@ export type Database = {
           verification_url: string
         }
         Update: {
+          issuer_domain?: string | null
           blockchain_id?: string
           content_hash?: string
           created_at?: string
@@ -378,6 +384,7 @@ export type Database = {
           diploma_url: string
           diplomator_seal: string
           institution_name: string
+          issuer_domain: string | null
           recipient_name: string
         }[]
       }

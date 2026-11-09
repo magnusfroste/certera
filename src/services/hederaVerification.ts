@@ -18,6 +18,8 @@ export interface VerifiedRecord {
   blockchain_id: string;
   recipient_name: string;
   institution_name: string;
+  /** Confirmed organisation email domain of the signer; null when unverified. */
+  issuer_domain: string | null;
   content_hash: string;
   created_at: string;
   diploma_html: string;
@@ -60,6 +62,8 @@ interface OnChainMessage {
   recipientNameHash?: string;
   institutionName?: string;
   diplomaId?: string;
+  /** Present on diplomas signed since issuer domains were recorded (may be null). */
+  issuerDomain?: string | null;
 }
 
 // Pick the mirror node that matches the network the diploma was signed on.
@@ -100,6 +104,7 @@ export async function verifyDiploma(diplomaId: string, recipientNameInput?: stri
     blockchain_id: row.blockchain_id,
     recipient_name: row.recipient_name,
     institution_name: row.institution_name,
+    issuer_domain: row.issuer_domain ?? null,
     content_hash: row.content_hash,
     created_at: row.created_at,
     diploma_html: row.diploma_html,
@@ -165,6 +170,20 @@ export async function verifyDiploma(diplomaId: string, recipientNameInput?: stri
         ok: recipientOnChain,
         detail: recipientOnChain ? undefined : 'The recorded recipient does not match the on-chain record.',
       });
+
+      // 4. The issuer domain shown matches the one written on Hedera at signing.
+      //    Older messages carry no issuerDomain field; then there is nothing
+      //    on-chain to compare, and the page shows the issuer as unverified.
+      if ('issuerDomain' in msg || record.issuer_domain) {
+        const onChainDomain = msg.issuerDomain ?? null;
+        const domainOk = onChainDomain === record.issuer_domain;
+        checks.push({
+          key: 'issuer-domain',
+          label: 'Issuer matches the Hedera record',
+          ok: domainOk,
+          detail: domainOk ? undefined : 'The issuer shown does not match the on-chain record.',
+        });
+      }
     } catch (e) {
       note = 'Could not reach the Hedera mirror node right now — showing the database record only. Try again shortly.';
       // Fall back to DB-only content integrity below.
