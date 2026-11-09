@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hederaConfig, parsePrivateKey } from "../_shared/hedera.ts";
+import { issuerDomainFromEmail } from "../_shared/issuerDomain.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +46,10 @@ serve(async (req) => {
       throw new Error('Missing required fields: contentHash, recipientName, institutionName, diplomaId');
     }
 
+    // The organisation email domain behind this signature, from the verified
+    // account — never from the request body. Null for personal mail providers.
+    const issuerDomain = issuerDomainFromEmail(user.email, Boolean(user.email_confirmed_at));
+
     // Build the HCS message payload
     const hcsMessage = {
       type: 'DIPLOMA_VERIFICATION',
@@ -53,6 +58,7 @@ serve(async (req) => {
       contentHash,
       recipientNameHash: await sha256(recipientName), // Privacy: hash the name
       institutionName,
+      issuerDomain,
       timestamp: new Date().toISOString(),
       issuerAccount: HEDERA_ACCOUNT_ID,
     };
@@ -120,6 +126,7 @@ serve(async (req) => {
       issuer_id: user.id,
       content_hash: contentHash,
       seal,
+      issuer_domain: issuerDomain,
     });
     if (recordError) throw new Error('Failed to record signature: ' + recordError.message);
 
@@ -131,6 +138,7 @@ serve(async (req) => {
       consensusTimestamp: new Date().toISOString(),
       explorerUrl: `${hedera.explorerBase}/topic/${topicId}`,
       txExplorerUrl: `${hedera.explorerBase}/transaction/${txId}`,
+      issuerDomain,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

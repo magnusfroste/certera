@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
+import { IssuerStamp } from '@/components/IssuerStamp';
 import { Link, useParams } from 'react-router-dom';
 import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, QrCode, Shield } from 'lucide-react';
 import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
@@ -125,6 +126,9 @@ const Diploma = () => {
                   </a>
                 ) : <span>Registered on Hedera</span>}
               </p>
+              <div className="mt-2">
+                <IssuerStamp domain={diplomaData.issuer_domain} institution={diplomaData.institution_name} />
+              </div>
             </div>
           </div>
 
