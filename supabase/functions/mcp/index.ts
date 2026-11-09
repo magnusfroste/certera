@@ -7,7 +7,7 @@ import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.4.0";
 
 // src/lib/mcp/tools/listSignedDiplomas.ts
 import { defineTool, ToolError } from "npm:@lovable.dev/mcp-js@3.4.0";
-import { z } from "npm:zod@^3.23.8";
+import { z } from "npm:zod@^3.25";
 
 // src/lib/mcp/supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.95.3";
@@ -54,7 +54,7 @@ var listSignedDiplomas_default = defineTool({
 
 // src/lib/mcp/tools/listDesignSessions.ts
 import { defineTool as defineTool2, ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@3.4.0";
-import { z as z2 } from "npm:zod@^3.23.8";
+import { z as z2 } from "npm:zod@^3.25";
 var listDesignSessions_default = defineTool2({
   name: "list_design_sessions",
   title: "List design sessions",
