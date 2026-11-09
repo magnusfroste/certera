@@ -29,7 +29,7 @@ const GuestSignShareCta = ({ action }: { action: 'sign' | 'share' }) => (
         ? 'Signing records your diploma on the Hedera blockchain — that needs a free account.'
         : 'Sharable links and QR codes are created when you sign a diploma to the blockchain.'}
     </p>
-    <a href="/auth" className="inline-block">
+    <a href="/auth?mode=signup" className="inline-block">
       <Button size="sm">Create free account →</Button>
     </a>
   </div>

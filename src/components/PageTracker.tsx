@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { campaignSource } from '../../supabase/functions/_shared/campaignSource';
 
 const TRACK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track`;
 
@@ -29,6 +30,9 @@ export const PageTracker = () => {
     const payload = JSON.stringify({
       path: pathname,
       referrer: isFirstView.current ? document.referrer : '',
+      // Campaign tag of the landing URL (?utm_source=…&utm_campaign=… or ?ref=…),
+      // first view only, like the referrer. The server keeps only a short tag.
+      source: isFirstView.current ? campaignSource(window.location.search) : '',
     });
     isFirstView.current = false;
 

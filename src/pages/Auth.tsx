@@ -12,8 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  // "Create account" buttons link here with ?mode=signup.
+  const initialTab = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
+  const { toast } = useToast();
   const nextParam = searchParams.get('next');
   const returnTo = nextParam ? oauthReturnPath(nextParam) : '/app';
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,10 @@ const Auth = () => {
         email,
         password,
         options: {
+          // Back to where sign-up started: the studio by default, where a
+          // design made as a guest is waiting (src/lib/guestDraft.ts), or the
+          // ?next= page (e.g. the MCP consent screen). www.certera.ink/** is an
+          // allowed redirect URL in Supabase Auth.
           emailRedirectTo: new URL(returnTo, window.location.origin).href,
           data: {
             name: name.trim() || email.split('@')[0],
@@ -55,7 +61,7 @@ const Auth = () => {
 
       toast({
         title: "Check your email",
-        description: "We've sent you a confirmation link to complete your registration.",
+        description: "We've sent you a confirmation link. Anything you designed in the demo will be waiting in your studio.",
       });
     } catch (error) {
       toast({
@@ -116,7 +122,7 @@ const Auth = () => {
 
         {/* Auth Card */}
         <div className="border border-border rounded-2xl bg-card p-6">
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>

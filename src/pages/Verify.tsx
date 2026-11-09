@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Building, CheckCircle2, ExternalLink, Hash, Home, Search, Shield, User, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,8 @@ const VerificationResult = ({ result, loading }: { result: VerifyResult | null; 
           {result.note && <p className="text-xs text-muted-foreground">{result.note}</p>}
         </div>
       </div>
+
+      <MakeYourOwnCta from="verify" />
     </section>
   );
 };

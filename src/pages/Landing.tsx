@@ -35,7 +35,7 @@ const Landing = () => (
         </p>
         <div className="flex justify-center flex-wrap gap-3 mt-6 mb-8 sm:mb-10">
           <Button asChild><Link to="/demo">Design a diploma <ArrowRight className="size-4 ml-2" /></Link></Button>
-          <Button variant="outline" asChild><Link to="/auth">Start issuing</Link></Button>
+          <Button variant="outline" asChild><Link to="/auth?mode=signup">Start issuing</Link></Button>
         </div>
         {sample && (
           <figure className="max-w-[800px] mx-auto text-left">

@@ -221,6 +221,7 @@ export type Database = {
           is_bot: boolean
           path: string
           referrer_host: string | null
+          source: string | null
           visitor_hash: string
         }
         Insert: {
@@ -231,6 +232,7 @@ export type Database = {
           is_bot?: boolean
           path: string
           referrer_host?: string | null
+          source?: string | null
           visitor_hash: string
         }
         Update: {
@@ -241,6 +243,7 @@ export type Database = {
           is_bot?: boolean
           path?: string
           referrer_host?: string | null
+          source?: string | null
           visitor_hash?: string
         }
         Relationships: []

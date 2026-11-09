@@ -12,6 +12,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { User } from "@supabase/supabase-js";
 import { Award } from "lucide-react";
 import { useGuestAccess } from "@/hooks/useGuestAccess";
+import { useGuestDraft } from "@/hooks/useGuestDraft";
 import { GuestBanner } from "@/components/GuestBanner";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -25,6 +26,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
   guestAccess: ReturnType<typeof useGuestAccess>;
 }) => {
   const { messages, diplomaHtml } = useDiploma();
+  useGuestDraft(isGuest, !!user);
   const hasStarted = messages.some(m => m.isUser);
   const hasCanvas = !!diplomaHtml;
   const isMobile = useIsMobile();
@@ -60,7 +62,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
               <div className="flex items-center gap-3">
                 {!isGuest && hasCanvas && <BlockchainMenu />}
                 {isGuest && (
-                  <a href="/auth" className="text-sm font-medium text-primary hover:underline">
+                  <a href="/auth?mode=signup" className="text-sm font-medium text-primary hover:underline">
                     Create account →
                   </a>
                 )}
