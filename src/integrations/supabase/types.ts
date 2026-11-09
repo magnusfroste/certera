@@ -372,7 +372,7 @@ export type Database = {
           created_at: string
           diploma_css: string
           diploma_html: string
-          diploma_url: string | null
+          diploma_url: string
           diplomator_seal: string
           institution_name: string
           recipient_name: string
