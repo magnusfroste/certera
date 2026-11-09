@@ -4,4 +4,4 @@
 - The legacy client renderer also uses the pure contrast helper so older entry points cannot bypass the same text safety.
 - Signed UI status and sharing URLs come from `useSignedDiploma`, matching the current personalized content hash, so edits cannot retain a stale signed status.
 - Reuse SharePanel for post-sign actions and the Share tab to keep export and sharing behaviour consistent.
-- On narrow screens the studio switches between Chat and Diploma views instead of squeezing a horizontal split; both views keep the same design state.
+- On narrow screens the studio switches between Chat and Diploma views instead of squeezing a horizontal split; both views keep the same design state.- The app MCP server lives in `src/lib/mcp/` (one tool per file, OAuth via the backend's auth issuer, caller-scoped client under RLS); the `supabase/functions/mcp` function is generated — never hand-edit it.
