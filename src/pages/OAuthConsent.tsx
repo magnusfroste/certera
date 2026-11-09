@@ -4,7 +4,15 @@ import { Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
-type OAuthResult = { data: any; error: { message: string } | null };
+type OAuthDetails = {
+  client?: { name?: string; client_name?: string; redirect_uri?: string };
+  scope?: string;
+  scopes?: string;
+  redirect_uri?: string;
+  redirect_url?: string;
+  redirect_to?: string;
+};
+type OAuthResult = { data: OAuthDetails | null; error: { message: string } | null };
 type OAuthApi = {
   getAuthorizationDetails: (id: string) => Promise<OAuthResult>;
   approveAuthorization: (id: string) => Promise<OAuthResult>;
@@ -21,7 +29,7 @@ const SCOPE_LABELS: Record<string, string> = {
 export default function OAuthConsent() {
   const [params] = useSearchParams();
   const authorizationId = params.get("authorization_id") ?? "";
-  const [details, setDetails] = useState<any>(null);
+  const [details, setDetails] = useState<OAuthDetails | null>(null);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
