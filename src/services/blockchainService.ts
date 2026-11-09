@@ -13,6 +13,8 @@ export interface DiplomaRecord {
   hederaTopicId?: string;
   hederaSequenceNumber?: string;
   hederaExplorerUrl?: string;
+  /** Public page of the signed diploma, for the recipient. */
+  diplomaUrl: string;
 }
 
 /** Fired on window after a diploma has been signed and stored */
@@ -149,6 +151,7 @@ export const signDiplomaToBlockchain = async (
     hederaTopicId: hederaResult.topicId,
     hederaSequenceNumber: hederaResult.sequenceNumber,
     hederaExplorerUrl: hederaResult.explorerUrl,
+    diplomaUrl,
   };
 };
 

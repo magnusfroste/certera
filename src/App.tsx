@@ -5,6 +5,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PageTracker } from "@/components/PageTracker";
 import { RouteMeta } from "@/components/RouteMeta";
 import { Toaster } from "@/components/ui/sonner";
+// Auth, Profile and Settings use the shadcn toast (useToast); without its
+// Toaster their messages - "check your email", "wrong password" - never showed.
+import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Landing from "./pages/Landing";
@@ -82,6 +85,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+        <ShadcnToaster />
         <BrowserRouter>
           <PageTracker />
           <RouteMeta />

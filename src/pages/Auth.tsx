@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Award, Mail, Lock, ArrowLeft, User } from 'lucide-react';
+import { Award, Mail, Lock, ArrowLeft, User, MailCheck } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { oauthReturnPath } from '@/lib/oauth-return-path';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,9 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  // After sign-up: the address the confirmation link went to. Shown in place of
+  // the form, so the next step cannot be missed the way a toast can.
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -59,6 +62,7 @@ const Auth = () => {
 
       if (error) throw error;
 
+      setSentTo(email);
       toast({
         title: "Check your email",
         description: "We've sent you a confirmation link. Anything you designed in the demo will be waiting in your studio.",
@@ -122,6 +126,18 @@ const Auth = () => {
 
         {/* Auth Card */}
         <div className="border border-border rounded-2xl bg-card p-6">
+          {sentTo ? (
+            <div className="text-center space-y-3 py-2" role="status">
+              <MailCheck className="w-10 h-10 text-primary mx-auto" />
+              <h2 className="text-lg font-semibold text-foreground">Check your inbox</h2>
+              <p className="text-sm text-muted-foreground">
+                We sent a confirmation link to <span className="text-foreground font-medium break-all">{sentTo}</span>.
+                Click it to finish creating your account — anything you designed in the demo will be waiting in your studio.
+              </p>
+              <p className="text-xs text-muted-foreground">No email after a few minutes? Check your spam folder, or</p>
+              <Button variant="outline" size="sm" onClick={() => setSentTo(null)}>Use a different email</Button>
+            </div>
+          ) : (
           <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -208,6 +224,7 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
+          )}
         </div>
       </div>
     </div>
