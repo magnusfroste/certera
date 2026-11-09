@@ -25,3 +25,7 @@ verify_jwt = false
 # Checks its own JWT (identity from the token, never the body), like hedera-sign.
 [functions.issuer-domain]
 verify_jwt = false
+
+# Public API: authenticates with its own API keys (api_keys), not a Supabase JWT.
+[functions.api]
+verify_jwt = false
