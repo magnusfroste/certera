@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, CheckCircle, ExternalLink, Loader2, Users, BadgeCheck, CircleHelp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { issuerDomainFromEmail } from '../../supabase/functions/_shared/issuerDomain';
+import { chooseIssuerDomain } from '../../supabase/functions/_shared/issuerDomain';
+import { Link } from 'react-router-dom';
 import { useDiploma } from '@/contexts/DiplomaContext';
 import { signDiplomaToBlockchain, DiplomaRecord } from '@/services/blockchainService';
 import { toast } from 'sonner';
@@ -19,9 +20,13 @@ export const BlockchainSigner = () => {
   // hedera-sign from the same rule) — shown before signing, not discovered after.
   const [issuer, setIssuer] = useState<{ domain: string | null; email: string } | null>(null);
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email) setIssuer({ email: user.email, domain: issuerDomainFromEmail(user.email, Boolean(user.email_confirmed_at)) });
-    });
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return;
+      const { data: dns } = await supabase.from('issuer_domains')
+        .select('domain').not('verified_at', 'is', null).maybeSingle();
+      setIssuer({ email: user.email, domain: chooseIssuerDomain(dns?.domain, user.email, Boolean(user.email_confirmed_at)) });
+    })();
   }, []);
   const { 
     diplomaHtml, 
@@ -94,7 +99,7 @@ export const BlockchainSigner = () => {
                 ) : (
                   <p className="flex items-start gap-1.5 text-xs text-muted-foreground leading-relaxed">
                     <CircleHelp className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>You are signed in with a personal address, so diplomas will show the issuer as not verified. Sign up with your work email to get a <span className="text-foreground font-medium">Verified issuer</span> stamp.</span>
+                    <span>You are signed in with a personal address, so diplomas will show the issuer as not verified. To get a <span className="text-foreground font-medium">Verified issuer</span> stamp, <Link to="/profile" className="underline underline-offset-2 hover:text-foreground">verify your organisation's domain</Link> or sign up with your work email.</span>
                   </p>
                 ))}
               </div>

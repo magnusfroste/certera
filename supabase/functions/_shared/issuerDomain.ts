@@ -48,3 +48,55 @@ export function issuerDomainFromEmail(email: unknown, confirmed: boolean): strin
   if (!DOMAIN.test(domain)) return null;
   return isPersonalEmailDomain(domain) ? null : domain;
 }
+
+// ─────────────────────────────────────────────────────────────────
+// DNS-verified domains (organisations without a mailbox on their domain)
+// ─────────────────────────────────────────────────────────────────
+// An account can prove control of a domain by publishing a TXT record:
+//   _certera.<domain>  TXT  "certera-verify=<token>"
+// The issuer-domain edge function hands out the token and checks the record;
+// only it can mark a domain verified. A DNS-verified domain takes precedence
+// over the email domain when signing, since verifying one is an explicit
+// choice to issue as that organisation.
+
+export const dnsRecordName = (domain: string) => `_certera.${domain}`;
+export const dnsRecordValue = (token: string) => `certera-verify=${token}`;
+
+/**
+ * What someone typed as their domain ("https://www.Nordlys.se/about") as a
+ * bare domain ("nordlys.se"), or null when it is not a domain an
+ * organisation can own (malformed, or a personal mail provider).
+ */
+export function normalizeDomainInput(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  let d = raw.trim().toLowerCase();
+  d = d.replace(/^[a-z][a-z0-9+.-]*:\/\//, '');   // scheme
+  d = d.split(/[/?#]/)[0];                         // path, query, fragment
+  d = d.replace(/^[^@]*@/, '');                    // user@ (also pasted emails)
+  d = d.replace(/:\d+$/, '').replace(/\.$/, '');   // port, trailing dot
+  d = d.replace(/^www\./, '');
+  if (!DOMAIN.test(d) || isPersonalEmailDomain(d)) return null;
+  return d;
+}
+
+/**
+ * Whether DNS TXT answers contain the expected value. Resolvers return each
+ * record quoted, and long records as several quoted strings ("a" "b").
+ */
+export function txtRecordsMatch(answers: string[], token: string): boolean {
+  const want = dnsRecordValue(token);
+  return answers.some((raw) => {
+    const parts = raw.match(/"((?:[^"\\]|\\.)*)"/g);
+    const value = parts ? parts.map((p) => p.slice(1, -1)).join('') : raw;
+    return value.trim() === want;
+  });
+}
+
+/** The domain a signature carries: a DNS-verified domain first, else the confirmed email's. */
+export function chooseIssuerDomain(
+  dnsVerifiedDomain: string | null | undefined,
+  email: unknown,
+  emailConfirmed: boolean,
+): string | null {
+  return dnsVerifiedDomain || issuerDomainFromEmail(email, emailConfirmed);
+}

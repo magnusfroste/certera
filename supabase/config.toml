@@ -21,3 +21,7 @@ verify_jwt = false
 
 [functions.hedera-health]
 verify_jwt = false
+
+# Checks its own JWT (identity from the token, never the body), like hedera-sign.
+[functions.issuer-domain]
+verify_jwt = false
