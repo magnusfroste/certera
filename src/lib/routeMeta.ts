@@ -30,6 +30,11 @@ const PUBLIC: Record<string, Omit<RouteMeta, 'canonical' | 'noindex'>> = {
     description:
       'Describe the diploma or certificate you need, or start from a template, and the AI designs it for you. Free, no account needed to try.',
   },
+  '/developers': {
+    title: 'Certificate API — issue verifiable certificates with one request' + SUFFIX,
+    description:
+      'Connect your course platform to certera: one API call or a "course completed" webhook issues a designed, signed certificate with a link anyone can verify. Free.',
+  },
   '/verify': {
     title: 'Verify a diploma or certificate' + SUFFIX,
     description:

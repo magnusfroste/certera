@@ -21,6 +21,7 @@ const Landing = () => (
           <Award className="size-5 text-primary" />certera.ink
         </Link>
         <div className="flex items-center gap-1 sm:gap-3">
+          <Button variant="ghost" size="sm" asChild><Link to="/developers">API</Link></Button>
           <Button variant="ghost" size="sm" asChild><Link to="/verify">Verify</Link></Button>
           <Button variant="outline" size="sm" asChild><Link to="/auth">Sign in</Link></Button>
         </div>
@@ -67,6 +68,25 @@ const Landing = () => (
           <Button variant="outline" asChild><Link to="/demo">Try the studio <ArrowRight className="size-4 ml-2" /></Link></Button>
         </div>
       </section>
+      <section className="border-t border-border bg-card/50">
+        <div className="max-w-5xl mx-auto px-6 sm:px-8 py-12 sm:py-14 grid md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <div>
+            <p className="text-xs font-mono text-muted-foreground mb-3">FOR COURSE PROVIDERS</p>
+            <h2 className="text-2xl font-semibold leading-snug">You run the course.<br />The certificates issue themselves.</h2>
+            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+              Connect your course platform with one API call or a “course completed” webhook. Every learner gets a signed
+              certificate with a link anyone can verify — free.
+            </p>
+            <Button className="mt-5" asChild><Link to="/developers">See the API <ArrowRight className="size-4 ml-2" /></Link></Button>
+          </div>
+          <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 text-xs sm:text-[13px] leading-relaxed"><code>{`POST /v1/certificates
+{ "template_id": "…", "recipient_name": "Ada Lovelace" }
+
+201 Created
+{ "url": "https://www.certera.ink/diploma/DIP_…",
+  "verified_issuer": true }`}</code></pre>
+        </div>
+      </section>
     </main>
     <footer className="border-t border-border">
       <div className="max-w-6xl mx-auto px-6 sm:px-8 py-7 flex flex-col sm:flex-row justify-between gap-5 text-xs text-muted-foreground">
@@ -74,6 +94,7 @@ const Landing = () => (
         <nav aria-label="Footer navigation" className="flex flex-wrap gap-5">
           <Link className="hover:text-foreground focus-visible:outline-ring" to="/verify">Verify a diploma</Link>
           <Link className="hover:text-foreground focus-visible:outline-ring" to="/demo">Demo</Link>
+          <Link className="hover:text-foreground focus-visible:outline-ring" to="/developers">API</Link>
           <Link className="hover:text-foreground focus-visible:outline-ring" to="/auth">Sign in</Link>
         </nav>
       </div>
