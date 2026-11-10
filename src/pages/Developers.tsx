@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Award, BadgeCheck, Check, Copy, KeyRound, PenLine, Repeat, Webhook, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// The API as deployed (supabase/functions/api). Everything shown on this page
+// The API as deployed (supabase/functions/api, behind api.certera.ink). Everything shown on this page
 // is what the function does today — keep the two in step.
-const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api`;
+// Served by the Cloudflare Worker in cloudflare/api-worker, which forwards to the
+// api edge function (the Supabase address keeps working too).
+const API_BASE = 'https://api.certera.ink';
 const SIGN_UP = "/auth?mode=signup&next=%2Fprofile";
 
 const CURL = `curl -X POST ${API_BASE}/v1/certificates \\

@@ -8,7 +8,9 @@ import { Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { API_KEY_PREFIX } from '../../supabase/functions/_shared/publicApi';
 
-const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api`;
+// Served by the Cloudflare Worker in cloudflare/api-worker, which forwards to the
+// api edge function (the Supabase address keeps working too).
+const API_BASE = 'https://api.certera.ink';
 
 interface ApiKey { id: string; label: string; prefix: string; created_at: string; last_used_at: string | null }
 interface Template { id: string; title: string }
