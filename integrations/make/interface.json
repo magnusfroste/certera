@@ -1,0 +1,21 @@
+[
+  { "name": "id", "type": "text", "label": "Certificate ID" },
+  { "name": "url", "type": "url", "label": "Certificate link" },
+  { "name": "verify_url", "type": "url", "label": "Verification link" },
+  { "name": "recipient_name", "type": "text", "label": "Recipient name" },
+  { "name": "institution_name", "type": "text", "label": "Issuer name" },
+  { "name": "issuer_domain", "type": "text", "label": "Verified issuer domain" },
+  { "name": "verified_issuer", "type": "boolean", "label": "Verified issuer" },
+  {
+    "name": "hedera",
+    "type": "collection",
+    "label": "Hedera record",
+    "spec": [
+      { "name": "topic_id", "type": "text", "label": "Topic ID" },
+      { "name": "sequence_number", "type": "text", "label": "Sequence number" },
+      { "name": "transaction_id", "type": "text", "label": "Transaction ID" },
+      { "name": "explorer_url", "type": "url", "label": "Explorer link" }
+    ]
+  },
+  { "name": "created_at", "type": "date", "label": "Issued at" }
+]

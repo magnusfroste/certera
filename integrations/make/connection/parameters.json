@@ -1,0 +1,9 @@
+[
+  {
+    "name": "apiKey",
+    "type": "password",
+    "label": "API key",
+    "required": true,
+    "help": "Create one at certera.ink → Profile → API keys. It starts with cert_."
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "id": "DIP_mw9sbl2i_yd55z43cx",
+  "url": "https://www.certera.ink/diploma/DIP_mw9sbl2i_yd55z43cx",
+  "verify_url": "https://www.certera.ink/verify/DIP_mw9sbl2i_yd55z43cx",
+  "recipient_name": "Elin Andersson",
+  "institution_name": "Nordlys Academy",
+  "issuer_domain": "nordlys.se",
+  "verified_issuer": true,
+  "hedera": {
+    "topic_id": "0.0.123456",
+    "sequence_number": "1",
+    "transaction_id": "0.0.1234@1731230000.000000000",
+    "explorer_url": "https://hashscan.io/testnet/transaction/0.0.1234@1731230000.000000000"
+  },
+  "created_at": "2026-11-10T09:00:00.000Z"
+}

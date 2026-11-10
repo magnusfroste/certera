@@ -1,0 +1,10 @@
+[
+  {
+    "name": "limit",
+    "type": "uinteger",
+    "label": "Limit",
+    "default": 10,
+    "required": true,
+    "help": "The most certificates to return in one run."
+  }
+]

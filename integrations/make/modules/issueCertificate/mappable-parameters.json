@@ -1,0 +1,30 @@
+[
+  {
+    "name": "template_id",
+    "type": "select",
+    "label": "Design",
+    "required": true,
+    "mappable": true,
+    "options": "rpc://listTemplates",
+    "help": "The certificate design to issue from. Create and save designs at certera.ink."
+  },
+  {
+    "name": "recipient_name",
+    "type": "text",
+    "label": "Recipient name",
+    "required": true,
+    "help": "The full name printed on the certificate (up to 120 characters)."
+  },
+  {
+    "name": "institution_name",
+    "type": "text",
+    "label": "Issuer name",
+    "help": "Leave empty to use the name in the design."
+  },
+  {
+    "name": "reference",
+    "type": "text",
+    "label": "Unique reference",
+    "help": "For example an enrollment or order ID. The same reference never issues a second certificate, so a re-run is safe."
+  }
+]

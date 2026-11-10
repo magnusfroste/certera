@@ -1,0 +1,11 @@
+{
+  "url": "/templates",
+  "method": "GET",
+  "response": {
+    "iterate": "{{body.templates}}",
+    "output": {
+      "label": "{{ifempty(item.title, 'Untitled design')}}",
+      "value": "{{item.id}}"
+    }
+  }
+}

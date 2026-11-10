@@ -1,0 +1,12 @@
+{
+  "url": "/certificates",
+  "method": "GET",
+  "qs": {
+    "limit": "{{ifempty(parameters.limit, 25)}}"
+  },
+  "response": {
+    "limit": "{{ifempty(parameters.limit, 25)}}",
+    "iterate": "{{body.certificates}}",
+    "output": "{{item}}"
+  }
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "id",
+    "type": "text",
+    "label": "Certificate ID",
+    "required": true,
+    "help": "Looks like DIP_mw9sbl2i_yd55z43cx."
+  }
+]
