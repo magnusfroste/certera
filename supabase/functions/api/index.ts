@@ -4,7 +4,9 @@
 //   GET  /v1/templates                 your saved designs (ids to sign from)
 //   POST /v1/certificates              sign one certificate
 //        { template_id, recipient_name, institution_name? }
+//   GET  /v1/certificates              your certificates, newest first (?limit=1-100)
 //   GET  /v1/certificates/:id          one of your certificates
+//   GET  /v1/me                        the account a key belongs to
 //   POST /v1/hooks/:template_id        "course completed" webhook from a course
 //        platform; the learner's name is read from the payload
 //        (?name_field=user.display_name to say where, ?institution= to override)
@@ -197,6 +199,26 @@ serve(async (req) => {
       });
     }
 
+    // Newest first. Automation tools poll this to trigger on new certificates.
+    if (req.method === 'GET' && path === '/v1/certificates') {
+      const asked = Number(url.searchParams.get('limit') ?? 25);
+      const limit = Number.isInteger(asked) && asked >= 1 && asked <= 100 ? asked : 25;
+      const { data, error } = await db.from('signed_diplomas').select(CERT_COLUMNS)
+        .eq('issuer_id', caller.userId).order('created_at', { ascending: false }).limit(limit);
+      if (error) throw new Error(error.message);
+      return json({ certificates: ((data ?? []) as CertRow[]).map(present) });
+    }
+
+    // Who a key belongs to: lets a connected tool label the connection.
+    if (req.method === 'GET' && path === '/v1/me') {
+      const { data: userData } = await db.auth.admin.getUserById(caller.userId);
+      const { data: dnsRow } = await db.from('issuer_domains')
+        .select('domain').eq('user_id', caller.userId).not('verified_at', 'is', null).maybeSingle();
+      const email = userData?.user?.email ?? null;
+      const issuerDomain = chooseIssuerDomain(dnsRow?.domain, email, Boolean(userData?.user?.email_confirmed_at));
+      return json({ account: email, issuer_domain: issuerDomain, verified_issuer: Boolean(issuerDomain) });
+    }
+
     const one = path.match(/^\/v1\/certificates\/([A-Za-z0-9_]{1,64})$/);
     if (req.method === 'GET' && one) {
       const { data } = await db.from('signed_diplomas').select(CERT_COLUMNS)
@@ -227,18 +249,20 @@ serve(async (req) => {
 
       const recipientName = cleanName(b.recipient_name);
       if (!recipientName) return fail(400, 'invalid_recipient', 'recipient_name is required (1–120 characters).');
-      if (b.institution_name !== undefined && !cleanName(b.institution_name)) {
+      // No-code tools send an empty field for "not filled in": that means "use the design's name".
+      const blankInstitution = b.institution_name == null || (typeof b.institution_name === 'string' && !b.institution_name.trim());
+      if (!blankInstitution && !cleanName(b.institution_name)) {
         return fail(400, 'invalid_institution', 'institution_name must be 1–120 characters.');
       }
       return await issue(db, caller, {
         templateId: String(b.template_id ?? ''),
         recipientName,
-        institutionOverride: cleanName(b.institution_name),
+        institutionOverride: blankInstitution ? null : cleanName(b.institution_name),
         idemKey: headerKey,
       });
     }
 
-    return fail(404, 'not_found', 'Unknown endpoint. Available: GET /v1/templates, POST /v1/certificates, GET /v1/certificates/:id, POST /v1/hooks/:template_id.');
+    return fail(404, 'not_found', 'Unknown endpoint. See https://www.certera.ink/developers');
   } catch (e) {
     console.error('api error:', e instanceof Error ? e.message : e);
     return fail(500, 'internal_error', 'Something went wrong on our side. The request can be retried safely with the same Idempotency-Key.');

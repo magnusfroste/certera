@@ -1,0 +1,9 @@
+[
+  {
+    "name": "limit",
+    "type": "uinteger",
+    "label": "Limit",
+    "default": 25,
+    "help": "How many certificates to return, newest first (1–100)."
+  }
+]

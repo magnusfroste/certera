@@ -1,0 +1,15 @@
+{
+  "url": "/certificates",
+  "method": "POST",
+  "headers": {
+    "Idempotency-Key": "{{parameters.reference}}"
+  },
+  "body": {
+    "template_id": "{{parameters.template_id}}",
+    "recipient_name": "{{parameters.recipient_name}}",
+    "institution_name": "{{parameters.institution_name}}"
+  },
+  "response": {
+    "output": "{{body}}"
+  }
+}

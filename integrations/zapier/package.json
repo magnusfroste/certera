@@ -1,0 +1,16 @@
+{
+  "name": "certera-zapier",
+  "version": "1.0.0",
+  "description": "Issue signed, verifiable certificates from any Zap with certera.ink.",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/app.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "zapier-platform-core": "19.3.0"
+  }
+}

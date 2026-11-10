@@ -1,0 +1,18 @@
+{
+  "url": "/certificates",
+  "method": "GET",
+  "qs": {
+    "limit": 100
+  },
+  "response": {
+    "limit": "{{parameters.limit}}",
+    "iterate": "{{body.certificates}}",
+    "trigger": {
+      "id": "{{item.id}}",
+      "date": "{{item.created_at}}",
+      "type": "date",
+      "order": "desc"
+    },
+    "output": "{{item}}"
+  }
+}

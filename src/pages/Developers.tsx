@@ -66,8 +66,10 @@ const features = [
 const endpoints: [string, string, string][] = [
   ["GET", "/v1/templates", "Your saved designs, with the ids to issue from."],
   ["POST", "/v1/certificates", "Issue one certificate: template_id, recipient_name, optional institution_name."],
+  ["GET", "/v1/certificates", "Your certificates, newest first. ?limit=1–100 (default 25)."],
   ["GET", "/v1/certificates/:id", "One of your certificates."],
   ["POST", "/v1/hooks/:template_id", "“Course completed” webhook. The learner's name is read from the payload."],
+  ["GET", "/v1/me", "The account a key belongs to, and its verified issuer domain."],
 ];
 
 const errors: [string, string, string][] = [
@@ -160,6 +162,10 @@ const Developers = () => (
             <li className="flex gap-2"><Check className="size-4 text-success mt-0.5 shrink-0" /><span>Name somewhere unusual? Add <code className="text-foreground">&amp;name_field=path.to.name</code></span></li>
             <li className="flex gap-2"><Check className="size-4 text-success mt-0.5 shrink-0" /><span>A retried delivery returns the same certificate — never a duplicate</span></li>
           </ul>
+          <p className="mt-5 text-sm text-muted-foreground leading-relaxed">
+            Using Zapier, Make or n8n? Add a webhook or HTTP step that POSTs to this URL — or to{" "}
+            <code className="text-foreground">/v1/certificates</code> with your key — and map the learner's name.
+          </p>
         </div>
         <div className="space-y-3 min-w-0">
           <Code label="Webhook URL" code={WEBHOOK} />
@@ -180,7 +186,7 @@ const Developers = () => (
 
       <section id="reference" className="max-w-5xl mx-auto px-6 sm:px-8 py-14 sm:py-16 scroll-mt-4">
         <p className="text-xs font-mono text-muted-foreground mb-3">REFERENCE</p>
-        <h2 className="text-2xl font-semibold">Four endpoints. That's the API.</h2>
+        <h2 className="text-2xl font-semibold">Six endpoints. That's the API.</h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-2xl">
           Base URL <code className="text-foreground break-all">{API_BASE}</code>. Authenticate with{" "}
           <code className="text-foreground">Authorization: Bearer cert_…</code>; webhooks may pass{" "}
