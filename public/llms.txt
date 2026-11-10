@@ -8,4 +8,5 @@ certera.ink lets schools, course providers and HR teams design branded, animated
 
 - [Home](https://www.certera.ink/)
 - [Demo](https://www.certera.ink/demo)
+- [Certificate API for course providers](https://www.certera.ink/developers): issue signed, verifiable certificates with one request or a course-completed webhook
 - [Verify a certificate](https://www.certera.ink/verify)

@@ -53,6 +53,7 @@ describe('route metadata', () => {
     expect(metaForPath('/')).toMatchObject({ canonical: 'https://www.certera.ink/', noindex: false });
     expect(metaForPath('/demo')).toMatchObject({ canonical: 'https://www.certera.ink/demo', noindex: false });
     expect(metaForPath('/verify/')).toMatchObject({ canonical: 'https://www.certera.ink/verify', noindex: false });
+    expect(metaForPath('/developers')).toMatchObject({ canonical: 'https://www.certera.ink/developers', noindex: false });
     expect(metaForPath('/demo').title).not.toBe(metaForPath('/').title);
   });
 
