@@ -1,0 +1,10 @@
+# api.certera.ink — forwards to the certera public API (see src/index.js).
+# Deploy: `npx wrangler deploy` from this directory, or paste src/index.js into
+# a Worker in the Cloudflare dashboard and add api.certera.ink as a Custom Domain.
+name = "certera-api"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+workers_dev = false
+
+# A Custom Domain creates the DNS record and certificate for api.certera.ink.
+routes = [{ pattern = "api.certera.ink", custom_domain = true }]
