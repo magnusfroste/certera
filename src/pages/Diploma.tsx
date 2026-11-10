@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
 import { IssuerStamp } from '@/components/IssuerStamp';
 import { Link, useParams } from 'react-router-dom';
-import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, QrCode, Shield } from 'lucide-react';
+import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, Linkedin, QrCode, Shield } from 'lucide-react';
 import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { DiplomaFrame } from '@/components/DiplomaFrame';
 import { toast } from 'sonner';
+import { certificationName, linkedInAddToProfileUrl } from '@/lib/linkedin';
 import { SITE_URL } from '@/lib/siteUrl';
 
 interface SealData {
@@ -149,6 +150,22 @@ const Diploma = () => {
           </Collapsible>
 
           <div className="mt-4 flex flex-wrap gap-2 border-t pt-4" aria-label="Diploma actions">
+            {/* The recipient's own next step, and how a certificate reaches other people. */}
+            <Button size="sm" asChild>
+              <a
+                href={linkedInAddToProfileUrl({
+                  name: certificationName(diplomaData.diploma_html, diplomaData.institution_name),
+                  organizationName: diplomaData.institution_name,
+                  issuedAt: diplomaData.created_at,
+                  certUrl: `${SITE_URL}/diploma/${diplomaData.blockchain_id}`,
+                  certId: diplomaData.blockchain_id,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Linkedin />Add to LinkedIn
+              </a>
+            </Button>
             <Button variant="outline" size="sm" onClick={copyLink}>
               {copied ? <Check /> : <Copy />}{copied ? 'Copied' : 'Copy link'}
             </Button>
