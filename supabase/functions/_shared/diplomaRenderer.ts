@@ -108,8 +108,12 @@ function compositionCss(comp: Composition, primary: string, accent: string, inne
       // so a grid on the container would squeeze everything into one column.
       return `.comp-split .diploma-border{display:grid;grid-template-columns:1fr 2fr;gap:2em;align-items:center}.comp-split .diploma-header{text-align:left;border-right:2px solid ${accent}40;padding-right:1.5em;margin-bottom:0}.comp-split .diploma-header .institution{text-align:left}.comp-split-content{display:flex;flex-direction:column;gap:.5em}`;
     case 'corner-accent':
-      // Inset from the edge so the container's overflow:hidden never clips it
-      return `.comp-corner{position:relative}.comp-corner::before{content:'';position:absolute;top:14px;left:14px;width:60px;height:60px;border-top:4px solid ${accent};border-left:4px solid ${accent}}.comp-corner::after{content:'';position:absolute;bottom:14px;right:14px;width:60px;height:60px;border-bottom:4px solid ${accent};border-right:4px solid ${accent}}`;
+      // Inset from the edge so the container's overflow:hidden never clips it.
+      // The two brackets are elements of their own (renderDSL adds them), not
+      // the container's ::before/::after: the ribbon and the pattern layers
+      // drew on those too, took the bracket's top-left position and size, and
+      // a ribbon "EST." sat over the institution's first letter.
+      return `.comp-corner{position:relative}.comp-corner>.corner-mark{position:absolute;width:60px;height:60px;pointer-events:none;z-index:2}.comp-corner>.corner-mark.tl{top:14px;left:14px;border-top:4px solid ${accent};border-left:4px solid ${accent}}.comp-corner>.corner-mark.br{bottom:14px;right:14px;border-bottom:4px solid ${accent};border-right:4px solid ${accent}}`;
     case 'classic-stack':
     default:
       return '';
@@ -133,7 +137,11 @@ function decorationCss(decos: string[], primary: string, accent: string): string
         out.push(`.deco-watermark .diploma-body{position:relative}.deco-watermark .diploma-body::before{content:'★';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:280px;color:${primary};opacity:.04;pointer-events:none;z-index:0}.deco-watermark .diploma-body>*{position:relative;z-index:1}`);
         break;
       case 'ribbon-banner':
-        out.push(`.deco-ribbon{position:relative;overflow:hidden}.deco-ribbon::before{content:'EST.';position:absolute;top:18px;right:-40px;background:${accent};color:#fff;padding:4px 50px;font-size:11px;font-weight:bold;letter-spacing:3px;transform:rotate(45deg);z-index:3}`);
+        // A plain band across the top-right corner, drawn by an element of its
+        // own (renderDSL adds it). It used to be the container's ::before with
+        // the text 'EST.' and no year; with corner-accent, which also drew on
+        // ::before, it landed top-left over the institution's name.
+        out.push(`.deco-ribbon{position:relative;overflow:hidden}.deco-ribbon>.ribbon-band{position:absolute;top:26px;right:-50px;width:190px;height:22px;background:${accent};transform:rotate(45deg);z-index:3;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.18)}`);
         break;
       case 'guilloche-pattern':
         patternLayers.push(`repeating-radial-gradient(circle at 0 0,transparent 0,${primary}08 1px,transparent 2px,transparent 18px)`, `repeating-radial-gradient(circle at 100% 100%,transparent 0,${accent}08 1px,transparent 2px,transparent 18px)`);
@@ -391,7 +399,11 @@ export function renderDSL(dsl: DiplomaDSL): {html:string;css:string} {
     ? `${headerHtml}<div class="comp-split-content">${bodyHtml}${bottomHtml}${footerHtml}</div>`
     : `${headerHtml}${bodyHtml}${bottomHtml}${footerHtml}`;
 
-  const html = `<div class="${wrapperClasses}"><div class="diploma-border">${inner}</div></div>`;
+  // Ornaments that are elements of their own, after the border so the A4
+  // sheet's `.diploma-container>.diploma-border` rules still match.
+  const ornaments = (composition === 'corner-accent' ? '<div class="corner-mark tl" aria-hidden="true"></div><div class="corner-mark br" aria-hidden="true"></div>' : '')
+    + (decos.includes('ribbon-banner') ? '<div class="ribbon-band" aria-hidden="true"></div>' : '');
+  const html = `<div class="${wrapperClasses}"><div class="diploma-border">${inner}</div>${ornaments}</div>`;
 
   return { html, css: cssParts.join('\n') };
 }
