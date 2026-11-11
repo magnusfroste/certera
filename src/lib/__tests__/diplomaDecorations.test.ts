@@ -41,3 +41,42 @@ describe('pattern decorations keep the palette background', () => {
     expect(html).toContain('deco-grid');
   });
 });
+
+// The ribbon and the corner-accent brackets both drew on the container's
+// ::before. Together, the ribbon took the bracket's top-left position and its
+// text 'EST.' (no year) sat over the first letter of the school's name:
+// "KESTREL BAY ACADEMY" read "ESTREL BAY ACADEMY" on every diploma.
+describe('ribbon banner and corner accent', () => {
+  const corner = (decorations: string[]) => ({
+    ...dsl('ivory-navy', decorations),
+    layout: { orientation: 'landscape', padding: 'normal', composition: 'corner-accent' },
+  }) as DiplomaDSL;
+
+  it('draws neither on the container pseudo-elements', () => {
+    const { css } = renderDSL(corner(['ribbon-banner']));
+    expect(css).not.toMatch(/\.(comp-corner|deco-ribbon)::(before|after)/);
+  });
+
+  it('gives the ribbon and both brackets elements of their own', () => {
+    const { html } = renderDSL(corner(['ribbon-banner']));
+    expect(html).toContain('class="ribbon-band"');
+    expect(html).toContain('class="corner-mark tl"');
+    expect(html).toContain('class="corner-mark br"');
+  });
+
+  it('puts no text in the ribbon', () => {
+    const { css, html } = renderDSL(corner(['ribbon-banner']));
+    expect(css).not.toContain("'EST.'");
+    expect(html).toMatch(/<div class="ribbon-band" aria-hidden="true"><\/div>/);
+  });
+
+  it('keeps the border the container\'s first child, so the A4 sheet still lays it out', () => {
+    const { html } = renderDSL(corner(['ribbon-banner']));
+    expect(html).toMatch(/^<div class="diploma-container[^"]*"><div class="diploma-border">/);
+  });
+
+  it('adds no ornaments to a design that asked for none', () => {
+    const { html } = renderDSL(dsl('ivory-navy', []));
+    expect(html).not.toMatch(/ribbon-band|corner-mark/);
+  });
+});
