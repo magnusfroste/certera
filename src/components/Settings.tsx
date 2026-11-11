@@ -16,19 +16,29 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { cssHasFormat, cssWithFormat, dslWithFormat, type DiplomaFormat } from '@/lib/diplomaFormat';
 
 // Settings content component for embedding in other dialogs
 export const SettingsContent = () => {
   const { toast } = useToast();
   // Use the shared context so the setting actually affects generation
-  const { diplomaFormat, setDiplomaFormat } = useDiploma();
+  const { diplomaFormat, setDiplomaFormat, diplomaHtml, diplomaCss, diplomaDsl, commitDesign } = useDiploma();
 
-  const handleFormatChange = (format: 'portrait' | 'landscape') => {
+  const handleFormatChange = (format: DiplomaFormat) => {
+    if (format === diplomaFormat) return;
     setDiplomaFormat(format);
     localStorage.setItem('diplomaFormat', format);
+    // Turn the design on screen too, as one undoable step.
+    if (diplomaHtml && cssHasFormat(diplomaCss)) {
+      commitDesign({
+        html: diplomaHtml,
+        css: cssWithFormat(diplomaCss, format),
+        dsl: dslWithFormat(diplomaDsl, format),
+      });
+    }
     toast({
-      title: "Format Updated",
-      description: `Diploma format set to ${format}`,
+      title: 'Format updated',
+      description: `A4 ${format}. New designs use it, and the one on screen was turned.`,
     });
   };
 
@@ -65,7 +75,7 @@ export const SettingsContent = () => {
               </Toggle>
             </div>
             <p className="text-sm text-muted-foreground">
-              Current format: <span className="font-medium capitalize">{diplomaFormat}</span>
+              A4 <span className="font-medium">{diplomaFormat}</span>. You can also ask in the chat: “make it portrait”.
             </p>
           </div>
         </CardContent>

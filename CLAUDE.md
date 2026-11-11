@@ -59,6 +59,18 @@ running app (see "Verifying" below). Keep `npm run build`, `npm run lint` and
 
 Path alias: `@/` → `src/` (see `components.json` / `tsconfig`).
 
+## Page format (A4)
+
+`supabase/functions/_shared/diplomaFormat.ts` (re-exported by
+`src/lib/diplomaFormat.ts`) owns the format rules. The renderer only caps the
+width (800px landscape, 620px portrait); every place a diploma is shown wraps
+it in an `.a4-sheet` (`sheetCss`) that gives it at least A4 height — studio
+preview, `DiplomaFrame`, `/embed/:id` and the PDF. The sheet is display-only:
+never put it in stored CSS, or signed diplomas' content hashes change. The
+format is decided server-side in `generate-diploma`: words in the latest chat
+message ("make it portrait") win, then the app's format setting, then the
+model's pick. The app's format control follows the design's CSS.
+
 ## Security invariants — do not regress
 
 - **Never render stored/generated diploma HTML with `dangerouslySetInnerHTML`.**

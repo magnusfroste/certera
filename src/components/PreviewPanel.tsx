@@ -7,6 +7,7 @@ import { useDiploma } from '@/contexts/DiplomaContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonacoEditor } from '@/components/MonacoEditor';
 import { previewHtml } from '@/lib/recipient';
+import { fitsSheet, formatFromCss, sheetCss } from '@/lib/diplomaFormat';
 
 // Lazy-load heavy tab content (SharePanel pulls in jspdf + html2canvas)
 const SharePanel = lazy(() => import('@/components/SharePanel').then((m) => ({ default: m.SharePanel })));
@@ -86,6 +87,7 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
   };
 
   const getPreviewContent = () => {
+    const onSheet = fitsSheet(diplomaHtml);
     if (!diplomaHtml && !diplomaCss) {
       return `
         <!DOCTYPE html>
@@ -159,30 +161,18 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
           }
           .diploma-wrapper {
             width: 100%;
-            min-height: calc(100vh - 40px);
+            ${onSheet ? '' : 'min-height: calc(100vh - 40px);'}
             position: relative;
             overflow-x: hidden;
           }
-          .diploma-wrapper * {
-            max-width: 100% !important;
-            box-sizing: border-box !important;
-          }
+          /* Free-form HTML is kept inside the frame; renderer output is laid out on
+             its sheet, where this would cut off the full-width banner. */
+          ${onSheet ? '' : `.diploma-wrapper * { max-width: 100% !important; box-sizing: border-box !important; }`}
           .diploma-wrapper [style*="position: absolute"],
           .diploma-wrapper [style*="position:absolute"] {
             max-width: 95% !important;
           }
-          ${diplomaFormat === 'portrait' ? `
-          /* Portrait diplomas render on a narrow (620px) canvas. The universal
-             max-width:100% rule above would otherwise stretch the container to
-             the full panel width, flattening portrait into a landscape shape —
-             so re-assert the portrait cap with higher specificity. Landscape is
-             left untouched (it intentionally fills the panel). */
-          .diploma-wrapper > .diploma-container {
-            max-width: 620px !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-          }
-          ` : ''}
+          ${onSheet ? sheetCss(formatFromCss(diplomaCss)) : ''}
           ${isEditMode ? `
           [contenteditable="true"] {
             outline: none;
@@ -203,7 +193,7 @@ export const PreviewPanel = ({ isGuest = false }: { isGuest?: boolean }) => {
         </style>
       </head>
       <body>
-        <div class="diploma-wrapper">
+        <div class="diploma-wrapper${onSheet ? ' a4-sheet' : ''}">
           ${isEditMode ? diplomaHtml : previewHtml(diplomaHtml, signingRecipientName)}
         </div>
         ${isEditMode ? `

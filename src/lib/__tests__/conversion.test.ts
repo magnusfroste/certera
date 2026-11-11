@@ -36,7 +36,7 @@ describe('guest draft (survives sign-up)', () => {
     const s = memory();
     s.setItem(GUEST_DRAFT_KEY, JSON.stringify({ ...draft, format: 'square', messages: [draft.messages[0], { id: 2 }, null], savedAt: 1 }));
     const d = readGuestDraft(10, s)!;
-    expect(d.format).toBe('portrait');
+    expect(d.format).toBe('landscape');
     expect(d.messages).toHaveLength(1);
   });
 

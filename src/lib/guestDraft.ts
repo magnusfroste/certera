@@ -73,7 +73,7 @@ export function readGuestDraft(now = Date.now(), store = storage()): GuestDraft 
     html: d.html,
     css: d.css,
     dsl: d.dsl ?? null,
-    format: d.format === 'landscape' ? 'landscape' : 'portrait',
+    format: d.format === 'portrait' ? 'portrait' : 'landscape',
     messages,
     savedAt: d.savedAt,
   };
