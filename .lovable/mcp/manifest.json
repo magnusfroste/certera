@@ -12,10 +12,138 @@
   "mcp": {
     "server": {
       "name": "certera-ink",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "certera-ink"
     },
     "tools": [
+      {
+        "name": "list_templates",
+        "title": "List certificate templates",
+        "description": "List the certificate designs in your certera account that certificates can be issued from, most recently updated first. Use a template's id with issue_certificates.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Max results (default 25).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_template",
+        "title": "Create a certificate template",
+        "description": "Save a finished certificate design as a template in your certera account, so signed certificates can be issued from it. Pass the design as static HTML plus CSS. Write {{recipient_name}} exactly where each recipient's name should appear. Scripts, forms, iframes and event handlers are refused; link images by https URL and load fonts with @import in the css. Design for an A4 page (about 800px wide landscape, 620px wide portrait).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "A name for the template, e.g. \"Leadership Programme certificate\"."
+            },
+            "html": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The certificate markup (body content only), with {{recipient_name}} where the name goes."
+            },
+            "css": {
+              "description": "The stylesheet for the markup, as plain CSS.",
+              "type": "string"
+            },
+            "institution_name": {
+              "description": "The issuing organisation, shown next to the certificate. Can also be given when issuing.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "format": {
+              "description": "A4 orientation (default landscape).",
+              "type": "string",
+              "enum": [
+                "landscape",
+                "portrait"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "html"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "issue_certificates",
+        "title": "Issue signed certificates",
+        "description": "Issue one signed certificate per recipient from a template in your certera account. Each certificate is recorded on Hedera and gets a public link that anyone can verify. This is real and cannot be undone: confirm the template and the exact list of names with the person before calling. Up to 20 recipients per call; an account can issue 200 per day.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "template_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "The template to issue from (see list_templates or create_template)."
+            },
+            "recipient_names": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": "Full names, one certificate each, exactly as they should be printed."
+            },
+            "institution_name": {
+              "description": "The issuing organisation. Leave out to use the template's.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "reference": {
+              "description": "A reference for this batch, e.g. a course run. Repeating a call with the same reference never issues a recipient twice.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "template_id",
+            "recipient_names"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
       {
         "name": "list_signed_diplomas",
         "title": "List signed diplomas",
