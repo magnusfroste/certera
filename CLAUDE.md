@@ -71,6 +71,17 @@ format is decided server-side in `generate-diploma`: words in the latest chat
 message ("make it portrait") win, then the app's format setting, then the
 model's pick. The app's format control follows the design's CSS.
 
+## Public API and MCP tools
+
+`supabase/functions/api` is the certificate API (documented on `/developers`,
+served at `api.certera.ink` through the Cloudflare worker). It owns templates,
+issuing, the daily limit and idempotency. The MCP tools in `src/lib/mcp/` are
+thin callers of that API with the signed-in person's token (`certeraApi`), so
+rules live in one place. `supabase/functions/mcp/index.ts` is generated from
+`src/lib/mcp/` by `npm run build` — edit the sources, commit both. Imported
+designs (`POST /v1/templates`) are free-form HTML with no DSL: validated by
+`_shared/templateImport.ts` (static content only) and never re-rendered.
+
 ## Security invariants — do not regress
 
 - **Never render stored/generated diploma HTML with `dangerouslySetInnerHTML`.**

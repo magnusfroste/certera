@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import type { ToolContext } from "@lovable.dev/mcp-js";
 
-const supabaseProjectUrl = () => {
+export const supabaseProjectUrl = () => {
   const url = process.env.SUPABASE_URL;
   if (!url) throw new Error("SUPABASE_URL is not configured");
   return url;
 };
-const supabasePublishableKey = () => {
+export const supabasePublishableKey = () => {
   const key = process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!key) throw new Error("Supabase publishable key is not configured");
   return key;

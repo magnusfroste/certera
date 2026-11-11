@@ -70,18 +70,130 @@ var listDesignSessions_default = defineTool2({
   }
 });
 
+// src/lib/mcp/tools/listTemplates.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@3.4.0";
+import { z as z3 } from "npm:zod@^4.6.7";
+
+// src/lib/mcp/api.ts
+import { ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@3.4.0";
+async function certeraApi(ctx, method, path, options) {
+  const body = options.body;
+  const idempotencyKey = options.idempotencyKey;
+  const token = ctx.getToken();
+  if (!token) throw new ToolError3("You are not signed in to certera.");
+  const response = await fetch(`${supabaseProjectUrl()}/functions/v1/api${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: supabasePublishableKey(),
+      ...body === void 0 ? {} : { "Content-Type": "application/json" },
+      ...idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}
+    },
+    body: body === void 0 ? void 0 : JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ToolError3(payload?.error?.message ?? `certera answered ${response.status}.`);
+  }
+  return payload;
+}
+
+// src/lib/mcp/tools/listTemplates.ts
+var listTemplates_default = defineTool3({
+  name: "list_templates",
+  title: "List certificate templates",
+  description: "List the certificate designs in your certera account that certificates can be issued from, most recently updated first. Use a template's id with issue_certificates.",
+  inputSchema: { limit: z3.number().int().min(1).max(100).optional().describe("Max results (default 25).") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    const { templates } = await certeraApi(ctx, "GET", "/v1/templates", {});
+    const shown = templates.slice(0, limit ?? 25);
+    const text = shown.length ? shown.map((t) => `${t.id}: ${t.title} (${t.format}${t.institution_name ? `, ${t.institution_name}` : ""}${t.has_recipient_placeholder ? "" : ", no {{recipient_name}} placeholder"})`).join("\n") : "No templates yet. Create one with create_template, or design one at https://www.certera.ink/app.";
+    return { content: [{ type: "text", text }], structuredContent: { templates: shown } };
+  }
+});
+
+// src/lib/mcp/tools/createTemplate.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@3.4.0";
+import { z as z4 } from "npm:zod@^4.6.7";
+var createTemplate_default = defineTool4({
+  name: "create_template",
+  title: "Create a certificate template",
+  description: "Save a finished certificate design as a template in your certera account, so signed certificates can be issued from it. Pass the design as static HTML plus CSS. Write {{recipient_name}} exactly where each recipient's name should appear. Scripts, forms, iframes and event handlers are refused; link images by https URL and load fonts with @import in the css. Design for an A4 page (about 800px wide landscape, 620px wide portrait).",
+  inputSchema: {
+    title: z4.string().min(1).max(120).describe('A name for the template, e.g. "Leadership Programme certificate".'),
+    html: z4.string().min(1).describe("The certificate markup (body content only), with {{recipient_name}} where the name goes."),
+    css: z4.string().optional().describe("The stylesheet for the markup, as plain CSS."),
+    institution_name: z4.string().min(1).max(120).optional().describe("The issuing organisation, shown next to the certificate. Can also be given when issuing."),
+    format: z4.enum(["landscape", "portrait"]).optional().describe("A4 orientation (default landscape).")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (input, ctx) => {
+    const template = await certeraApi(ctx, "POST", "/v1/templates", { body: input });
+    const text = [
+      `Template saved: ${template.title} (id ${template.id}, ${template.format}).`,
+      template.warning ?? "Issue certificates from it with issue_certificates."
+    ].join("\n");
+    return { content: [{ type: "text", text }], structuredContent: { template: { ...template, warning: template.warning ?? null } } };
+  }
+});
+
+// src/lib/mcp/tools/issueCertificates.ts
+import { defineTool as defineTool5, ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@3.4.0";
+import { z as z5 } from "npm:zod@^4.6.7";
+var issueCertificates_default = defineTool5({
+  name: "issue_certificates",
+  title: "Issue signed certificates",
+  description: "Issue one signed certificate per recipient from a template in your certera account. Each certificate is recorded on Hedera and gets a public link that anyone can verify. This is real and cannot be undone: confirm the template and the exact list of names with the person before calling. Up to 20 recipients per call; an account can issue 200 per day.",
+  inputSchema: {
+    template_id: z5.string().uuid().describe("The template to issue from (see list_templates or create_template)."),
+    recipient_names: z5.array(z5.string().min(1).max(120)).min(1).max(20).describe("Full names, one certificate each, exactly as they should be printed."),
+    institution_name: z5.string().min(1).max(120).optional().describe("The issuing organisation. Leave out to use the template's."),
+    reference: z5.string().min(1).max(100).optional().describe("A reference for this batch, e.g. a course run. Repeating a call with the same reference never issues a recipient twice.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async ({ template_id, recipient_names, institution_name, reference }, ctx) => {
+    const names = recipient_names.map((n) => n.trim()).filter(Boolean);
+    if (!names.length) throw new ToolError4("Give at least one recipient name.");
+    const outcomes = [];
+    for (const recipient_name of names) {
+      try {
+        const certificate = await certeraApi(ctx, "POST", "/v1/certificates", {
+          body: { template_id, recipient_name, ...institution_name ? { institution_name } : {} },
+          idempotencyKey: reference ? `mcp:${reference}:${recipient_name}`.slice(0, 200) : void 0
+        });
+        outcomes.push({ recipient_name, certificate });
+      } catch (e) {
+        outcomes.push({ recipient_name, error: e instanceof Error ? e.message : "Unknown error" });
+        if (outcomes.every((o) => o.error)) break;
+      }
+    }
+    const issued = outcomes.filter((o) => o.certificate);
+    if (!issued.length) throw new ToolError4(`No certificate was issued. ${outcomes[0]?.error ?? ""}`.trim());
+    const failed = outcomes.filter((o) => o.error);
+    const notTried = names.length - outcomes.length;
+    const lines = [
+      `Issued ${issued.length} of ${names.length} certificate${names.length === 1 ? "" : "s"}.`,
+      ...issued.map((o) => `${o.recipient_name}: ${o.certificate.url}`),
+      ...failed.map((o) => `${o.recipient_name}: NOT issued \u2014 ${o.error}`),
+      ...notTried > 0 ? [`${notTried} recipient(s) were not attempted.`] : []
+    ];
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent: { issued: issued.map((o) => o.certificate), failed: failed.map((o) => ({ recipient_name: o.recipient_name, error: o.error ?? "" })) } };
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jiokwdsnmgmcjoyxrwax";
 var mcp_default = defineMcp({
   name: "certera-ink",
   title: "certera-ink",
-  version: "0.1.0",
-  instructions: "Tools for certera.ink. List the diplomas you have signed on Hedera (with verification links) and your diploma design sessions.",
+  version: "0.2.0",
+  instructions: "Tools for certera.ink, which turns a certificate design into signed, verifiable certificates. Save a finished design (static HTML + CSS with {{recipient_name}} where the name goes) with create_template, then issue one certificate per person with issue_certificates: each is recorded on Hedera and gets a public link. Issuing is real and permanent, so confirm the template and the names with the person first. You can also list templates, signed diplomas and design sessions.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
   }),
-  tools: [listSignedDiplomas_default, listDesignSessions_default]
+  tools: [listTemplates_default, createTemplate_default, issueCertificates_default, listSignedDiplomas_default, listDesignSessions_default]
 });
 
 // lovable-mcp-supabase-entry.ts
