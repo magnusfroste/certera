@@ -50,7 +50,7 @@ ${safeCss}
 html, body { margin: 0; padding: 0; background: #fff; }
 * { box-sizing: border-box !important; }
 #pdf-page { width: ${width}px; min-height: ${height}px; padding: ${signed ? '12px 12px 0' : '0'}; background: #fff; position: relative; overflow: hidden; }
-${onSheet ? sheetCss(formatFromCss(input.css)) : `#pdf-page { padding: 20px; } #pdf-page .diploma-container { width: 100% !important; }`}
+${onSheet ? sheetCss(formatFromCss(input.css)) : `#pdf-page { width: max-content; min-width: ${width}px; padding: 20px 20px ${signed ? '0' : '20px'}; } #pdf-page .diploma-container { width: 100% !important; }`}
 </style>
 </head>
 <body>
@@ -80,7 +80,7 @@ export async function downloadDiplomaPdf(input: { html: string; css: string; dip
   frame.setAttribute('sandbox', 'allow-same-origin');
   frame.setAttribute('aria-hidden', 'true');
   frame.tabIndex = -1;
-  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${width}px;height:${height}px;border:0;opacity:0;pointer-events:none;`;
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${width * 2}px;height:${height}px;border:0;opacity:0;pointer-events:none;`;
   const loaded = waitForLoad(frame);
   frame.srcdoc = buildPdfDocument(input);
   document.body.appendChild(frame);
@@ -99,19 +99,22 @@ export async function downloadDiplomaPdf(input: { html: string; css: string; dip
     // Canvas text is drawn with the fonts of the document that owns the
     // canvas, so the canvas must come from the frame that loaded them.
     // A diploma with more text than an A4 page holds is captured whole and scaled to fit.
-    const captureHeight = Math.max(height, Math.ceil(page.getBoundingClientRect().height));
+    const pageBox = page.getBoundingClientRect();
+    const captureHeight = Math.max(height, Math.ceil(pageBox.height));
+    // A free-form design wider than the page is captured whole as well.
+    const captureWidth = Math.max(width, Math.ceil(pageBox.width));
     const scale = 2.5;
     const target = doc.createElement('canvas');
-    target.width = Math.floor(width * scale);
+    target.width = Math.floor(captureWidth * scale);
     target.height = Math.floor(captureHeight * scale);
     const canvas = await html2canvas(page, {
-      canvas: target, width, height: captureHeight, scale, useCORS: true, backgroundColor: '#ffffff', logging: false,
+      canvas: target, width: captureWidth, height: captureHeight, scale, useCORS: true, backgroundColor: '#ffffff', logging: false,
     });
 
     const pdf = new jsPDF(height > width ? 'portrait' : 'landscape', 'mm', 'a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = captureHeight / width;
+    const ratio = captureHeight / captureWidth;
     let w = pageW;
     let h = pageW * ratio;
     if (h > pageH) { h = pageH; w = pageH / ratio; }
