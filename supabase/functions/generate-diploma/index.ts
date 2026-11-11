@@ -9,6 +9,7 @@ const corsHeaders = {
 
 
 import { renderDSL, esc, PALETTES, PALETTE_IDS, TYPOGRAPHY_IDS, type DiplomaDSL } from "../_shared/diplomaRenderer.ts";
+import { isDiplomaFormat, requestedFormat } from '../_shared/diplomaFormat.ts';
 import {
   CUSTOM_PROVIDERS_KEY, parseCustomProviders, secretNameFor, openAICompatibleChat, readChat,
   type CustomProvider,
@@ -499,7 +500,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, requestType, imageData, url, currentHtml, currentCss, currentDsl, userFullName, providerOverride } = await req.json();
+    const { messages, requestType, imageData, url, currentHtml, currentCss, currentDsl, userFullName, providerOverride, diplomaFormat } = await req.json();
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -797,6 +798,19 @@ serve(async (req) => {
       } catch (e) {
         console.error('DSL repair round failed, rendering original:', e instanceof Error ? e.message : e);
       }
+    }
+
+    // Page format is not left to the model: what the person just asked for in
+    // words wins, then the format chosen in the app, then the model's pick.
+    const lastUser = [...((messages || []) as AIMessage[])].reverse().find((m) => m.role === 'user');
+    const lastUserText = typeof lastUser?.content === 'string'
+      ? lastUser.content
+      : Array.isArray(lastUser?.content)
+        ? (lastUser.content as Array<{ type?: string; text?: string }>).map((c) => c?.text ?? '').join(' ')
+        : '';
+    const pageFormat = requestedFormat(lastUserText) ?? (isDiplomaFormat(diplomaFormat) ? diplomaFormat : null);
+    if (pageFormat && dsl && typeof dsl === 'object') {
+      dsl.layout = { ...(dsl.layout ?? {}), orientation: pageFormat };
     }
     applyDeterministicFixes(dsl);
 

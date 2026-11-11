@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { cssHasFormat, formatFromCss } from '@/lib/diplomaFormat';
 
 interface DiplomaFields {
   recipientName: string;
@@ -72,7 +73,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   const [signingInstitutionName, setSigningInstitutionName] = useState('');
   const [diplomaFormat, setDiplomaFormat] = useState<'portrait' | 'landscape'>(() => {
     const saved = localStorage.getItem('diplomaFormat');
-    return saved === 'landscape' || saved === 'portrait' ? saved : 'portrait';
+    return saved === 'landscape' || saved === 'portrait' ? saved : 'landscape';
   });
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [diplomaFields, setDiplomaFields] = useState<DiplomaFields>(EMPTY_FIELDS);
@@ -93,6 +94,11 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => { cssRef.current = diplomaCss; }, [diplomaCss]);
   useEffect(() => { dslRef.current = diplomaDsl; }, [diplomaDsl]);
   useEffect(() => { formatRef.current = diplomaFormat; }, [diplomaFormat]);
+  // The format control follows the design on screen: a new generation, an
+  // undo or "make it portrait" in the chat all show up in it.
+  useEffect(() => {
+    if (cssHasFormat(diplomaCss)) setDiplomaFormat(formatFromCss(diplomaCss));
+  }, [diplomaCss]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
 
@@ -212,7 +218,7 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     historyRef.current = [];
     setCanUndo(false);
     const saved = localStorage.getItem('diplomaFormat');
-    setDiplomaFormat(saved === 'landscape' || saved === 'portrait' ? saved : 'portrait');
+    setDiplomaFormat(saved === 'landscape' || saved === 'portrait' ? saved : 'landscape');
     setDiplomaFields(EMPTY_FIELDS);
     setMessages([]);
     // Allow saves again after React flushes the reset. setTimeout (not rAF)
@@ -243,7 +249,8 @@ export const DiplomaProvider = ({ children }: { children: ReactNode }) => {
     setDiplomaHtml(data.diploma_html);
     setDiplomaCss(data.diploma_css);
     setDiplomaDsl(data.diploma_dsl ?? null);
-    setDiplomaFormat((data.diploma_format as 'portrait' | 'landscape') || 'portrait');
+    // The stored column was never reliable; the design's own CSS is.
+    setDiplomaFormat(cssHasFormat(data.diploma_css) ? formatFromCss(data.diploma_css) : data.diploma_format === 'portrait' ? 'portrait' : 'landscape');
 
     const savedMessages = data.messages as unknown;
     if (Array.isArray(savedMessages) && savedMessages.length > 0) {

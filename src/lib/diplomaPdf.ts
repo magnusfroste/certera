@@ -1,11 +1,13 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QRCodeSVG } from 'qrcode.react';
+import { fitsSheet, formatFromCss, sheetCss, SHEET_RATIO, SHEET_WIDTH } from '@/lib/diplomaFormat';
 
-/** The renderer caps portrait diplomas at 620px and landscape ones at 800px. */
-export const isPortraitDiploma = (css: string) => /\.diploma-container\s*\{[^}]*max-width:\s*620px/i.test(css || '');
-
-export const pdfBox = (css: string) => (isPortraitDiploma(css) ? { width: 600, height: 800 } : { width: 800, height: 600 });
+/** The PDF page in CSS pixels: an A4 sheet as wide as the diploma's format. */
+export const pdfBox = (css: string) => {
+  const format = formatFromCss(css);
+  return { width: SHEET_WIDTH[format], height: Math.round(SHEET_WIDTH[format] * SHEET_RATIO[format]) };
+};
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -19,6 +21,7 @@ export const pdfFileName = (diplomaId?: string) =>
  */
 export function buildPdfDocument(input: { html: string; css: string; diplomaId?: string; verificationUrl?: string }): string {
   const { width, height } = pdfBox(input.css);
+  const onSheet = fitsSheet(input.html);
   const safeCss = (input.css || '').replace(/<\/style/gi, '<\\/style');
   const signed = Boolean(input.diplomaId && input.verificationUrl);
   const qr = signed
@@ -26,14 +29,16 @@ export function buildPdfDocument(input: { html: string; css: string; diplomaId?:
         value: input.verificationUrl!, size: 60, level: 'M', includeMargin: true, bgColor: '#ffffff', fgColor: '#000000',
       }))
     : '';
-  // Labels are drawn as SVG: html2canvas places SVG text exactly, while its
-  // own text layout drifts for fonts it cannot measure.
-  const idWidth = Math.ceil((input.diplomaId ?? '').length * 4.3) + 10;
+  // The proof sits in its own strip under the diploma so it never covers the
+  // design. Labels are SVG: html2canvas places SVG text exactly, while its own
+  // text layout drifts for fonts it cannot measure.
+  const host = (input.verificationUrl ?? '').replace(/^https?:\/\/(www\.)?/, '');
   const proof = signed ? `
-<div style="position:absolute;top:12px;right:12px;width:150px;height:24px;z-index:1000;line-height:0;"><svg xmlns="http://www.w3.org/2000/svg" width="150" height="24"><rect width="150" height="24" rx="12" fill="#2563eb"/><text x="75" y="16" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="600" fill="#ffffff">Verified by certera.ink</text></svg></div>
-<div style="position:absolute;bottom:6px;left:12px;z-index:1000;line-height:0;">
-  <div style="display:block;width:74px;background:#fff;padding:5px;border-radius:6px;border:2px solid #e5e7eb;margin-bottom:3px;"><div style="width:60px;height:60px;">${qr}</div></div>
-  <svg xmlns="http://www.w3.org/2000/svg" width="${idWidth}" height="13"><rect x="0.5" y="0.5" width="${idWidth - 1}" height="12" rx="3" fill="#ffffff" stroke="#d1d5db"/><text x="5" y="9.5" font-family="'Courier New',Courier,monospace" font-size="7" fill="#444444">${escapeHtml(input.diplomaId!)}</text></svg>
+<div style="display:flex;align-items:center;gap:10px;height:68px;padding:0 4px;line-height:0;">
+  <div style="width:60px;height:60px;flex:none;">${qr}</div>
+  <svg xmlns="http://www.w3.org/2000/svg" width="460" height="34" style="flex:none;"><text x="0" y="13" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="600" fill="#111827">Scan to verify this certificate</text><text x="0" y="28" font-family="'Courier New',Courier,monospace" font-size="9" fill="#4b5563">${escapeHtml(host)}</text></svg>
+  <div style="flex:1 1 auto;"></div>
+  <svg xmlns="http://www.w3.org/2000/svg" width="150" height="24" style="flex:none;"><rect width="150" height="24" rx="12" fill="#2563eb"/><text x="75" y="16" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="600" fill="#ffffff">Verified by certera.ink</text></svg>
 </div>` : '';
 
   return `<!DOCTYPE html>
@@ -44,13 +49,12 @@ export function buildPdfDocument(input: { html: string; css: string; diplomaId?:
 ${safeCss}
 html, body { margin: 0; padding: 0; background: #fff; }
 * { box-sizing: border-box !important; }
-#pdf-page { width: ${width}px; height: ${height}px; padding: 20px; background: #fff; position: relative; overflow: hidden; }
-#pdf-page > .pdf-diploma, #pdf-page .diploma-container { width: 100% !important; height: 100% !important; position: relative !important; overflow: hidden !important; }
-#pdf-page .diploma-container * { max-width: 95% !important; }
+#pdf-page { width: ${width}px; min-height: ${height}px; padding: ${signed ? '12px 12px 0' : '0'}; background: #fff; position: relative; overflow: hidden; }
+${onSheet ? sheetCss(formatFromCss(input.css)) : `#pdf-page { padding: 20px; } #pdf-page .diploma-container { width: 100% !important; }`}
 </style>
 </head>
 <body>
-<div id="pdf-page"><div class="pdf-diploma">${input.html}</div>${proof}</div>
+<div id="pdf-page"><div class="${onSheet ? 'a4-sheet' : 'pdf-diploma'}">${input.html}</div>${proof}</div>
 </body>
 </html>`;
 }
@@ -94,18 +98,20 @@ export async function downloadDiplomaPdf(input: { html: string; css: string; dip
 
     // Canvas text is drawn with the fonts of the document that owns the
     // canvas, so the canvas must come from the frame that loaded them.
+    // A diploma with more text than an A4 page holds is captured whole and scaled to fit.
+    const captureHeight = Math.max(height, Math.ceil(page.getBoundingClientRect().height));
     const scale = 2.5;
     const target = doc.createElement('canvas');
     target.width = Math.floor(width * scale);
-    target.height = Math.floor(height * scale);
+    target.height = Math.floor(captureHeight * scale);
     const canvas = await html2canvas(page, {
-      canvas: target, width, height, scale, useCORS: true, backgroundColor: '#ffffff', logging: false,
+      canvas: target, width, height: captureHeight, scale, useCORS: true, backgroundColor: '#ffffff', logging: false,
     });
 
     const pdf = new jsPDF(height > width ? 'portrait' : 'landscape', 'mm', 'a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = height / width;
+    const ratio = captureHeight / width;
     let w = pageW;
     let h = pageW * ratio;
     if (h > pageH) { h = pageH; w = pageH / ratio; }

@@ -6,9 +6,9 @@ const landscape = '.diploma-container { max-width: 800px; }';
 const portrait = '.diploma-container { max-width: 620px; }';
 
 describe('diploma PDF', () => {
-  it('sizes the page from the orientation in the stored CSS', () => {
-    expect(pdfBox(landscape)).toEqual({ width: 800, height: 600 });
-    expect(pdfBox(portrait)).toEqual({ width: 600, height: 800 });
+  it("sizes the page as an A4 sheet in the design's format", () => {
+    expect(pdfBox(landscape)).toEqual({ width: 800, height: 566 });
+    expect(pdfBox(portrait)).toEqual({ width: 620, height: 877 });
   });
 
   it('prints the verification QR code and the id on a signed diploma', () => {

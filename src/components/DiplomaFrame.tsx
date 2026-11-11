@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { fitsSheet, formatFromCss, sheetCss, SHEET_WIDTH } from '@/lib/diplomaFormat';
 
 interface DiplomaFrameProps {
   html: string;
@@ -24,7 +25,10 @@ export const DiplomaFrame = ({ html, css, title = 'Diploma', className, minHeigh
   const language = parsedLanguage && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(parsedLanguage)
     ? parsedLanguage
     : 'en-GB';
-  const canvasWidth = /\.diploma-container\s*\{[^}]*max-width:\s*620px/i.test(css) ? 620 : 800;
+  const format = formatFromCss(css);
+  const canvasWidth = SHEET_WIDTH[format];
+  // Renderer output is shown on an A4 sheet; older free-form diplomas as they are.
+  const onSheet = fitsSheet(html);
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
   const fitCss = fitToWidth
     ? `
@@ -33,7 +37,8 @@ body { overflow: hidden; }
 #diploma-frame-canvas > .diploma-container { width: ${canvasWidth}px !important; max-width: ${canvasWidth}px !important; }
 `
     : '';
-  const framedHtml = fitToWidth ? `<div id="diploma-frame-canvas">${html}</div>` : html;
+  const sheet = onSheet ? `<div class="a4-sheet">${html}</div>` : html;
+  const framedHtml = fitToWidth ? `<div id="diploma-frame-canvas">${sheet}</div>` : sheet;
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -55,6 +60,7 @@ body { overflow: hidden; }
 ${safeCss}
 body { margin: 0; padding: 0; overflow-x: hidden; }
 ${fitCss}
+${onSheet ? sheetCss(format) : ''}
 </style>
 </head>
 <body>
