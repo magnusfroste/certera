@@ -97,6 +97,7 @@ export type Database = {
           diploma_format: string
           diploma_html: string
           id: string
+          institution_name: string | null
           messages: Json
           title: string
           updated_at: string
@@ -109,6 +110,7 @@ export type Database = {
           diploma_format?: string
           diploma_html?: string
           id?: string
+          institution_name?: string | null
           messages?: Json
           title?: string
           updated_at?: string
@@ -121,6 +123,7 @@ export type Database = {
           diploma_format?: string
           diploma_html?: string
           id?: string
+          institution_name?: string | null
           messages?: Json
           title?: string
           updated_at?: string
