@@ -65,6 +65,7 @@ const features = [
 
 const endpoints: [string, string, string][] = [
   ["GET", "/v1/templates", "Your saved designs, with the ids to issue from."],
+  ["POST", "/v1/templates", "Bring your own design: title, html, optional css, institution_name, format. Returns the template id."],
   ["POST", "/v1/certificates", "Issue one certificate: template_id, recipient_name, optional institution_name."],
   ["GET", "/v1/certificates", "Your certificates, newest first. ?limit=1–100 (default 25)."],
   ["GET", "/v1/certificates/:id", "One of your certificates."],
@@ -72,8 +73,11 @@ const endpoints: [string, string, string][] = [
   ["GET", "/v1/me", "The account a key belongs to, and its verified issuer domain."],
 ];
 
+const MCP_URL = "https://jiokwdsnmgmcjoyxrwax.supabase.co/functions/v1/mcp";
+
 const errors: [string, string, string][] = [
   ["401", "unauthorized", "Missing or unknown API key."],
+  ["400", "active_content", "An imported design contains scripts, forms or event handlers."],
   ["400", "invalid_recipient", "recipient_name is missing or longer than 120 characters."],
   ["404", "template_not_found", "No design with that id in your account."],
   ["409", "in_progress", "The same Idempotency-Key is still being processed. Retry shortly."],
@@ -186,7 +190,7 @@ const Developers = () => (
 
       <section id="reference" className="max-w-5xl mx-auto px-6 sm:px-8 py-14 sm:py-16 scroll-mt-4">
         <p className="text-xs font-mono text-muted-foreground mb-3">REFERENCE</p>
-        <h2 className="text-2xl font-semibold">Six endpoints. That's the API.</h2>
+        <h2 className="text-2xl font-semibold">Seven endpoints. That's the API.</h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-2xl">
           Base URL <code className="text-foreground break-all">{API_BASE}</code>. Authenticate with{" "}
           <code className="text-foreground">Authorization: Bearer cert_…</code>; webhooks may pass{" "}
@@ -206,6 +210,15 @@ const Developers = () => (
             </tbody>
           </table>
         </div>
+
+        <h3 className="mt-10 text-sm font-semibold">Designed somewhere else?</h3>
+        <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-2xl">
+          A certificate made in a design tool or by hand works as a template: send its static HTML and CSS to{" "}
+          <code className="text-foreground">POST /v1/templates</code> with{" "}
+          <code className="text-foreground">{"{{recipient_name}}"}</code> where the name goes, then issue from the id you get back.
+          Scripts, forms and event handlers are refused. Working in an AI assistant? Connect certera's MCP server
+          (<code className="text-foreground break-all">{MCP_URL}</code>) and ask it to save the design and issue the certificates.
+        </p>
 
         <h3 className="mt-10 text-sm font-semibold">Errors</h3>
         <p className="mt-2 text-sm text-muted-foreground">

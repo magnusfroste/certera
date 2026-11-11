@@ -2,6 +2,8 @@
 // api — certera.ink public API: certificates as an API call
 // ============================================================================
 //   GET  /v1/templates                 your saved designs (ids to sign from)
+//   POST /v1/templates                 bring your own design as a template
+//        { title, html, css?, institution_name?, format? }
 //   POST /v1/certificates              sign one certificate
 //        { template_id, recipient_name, institution_name? }
 //   GET  /v1/certificates              your certificates, newest first (?limit=1-100)
@@ -13,9 +15,8 @@
 //
 // Auth: Authorization: Bearer cert_…  (webhooks may use ?key=cert_… instead,
 // since most platforms cannot set headers). Keys are created in Profile and
-// stored only as a SHA-256 hash.
-//
-// (There is no /developers page yet; Profile → API shows ready-to-run examples.)
+// stored only as a SHA-256 hash. A signed-in person's session token is accepted
+// as well; certera's MCP tools use that. Documented at /developers.
 //
 // A certificate is a real Hedera transaction, so: requests are idempotent
 // (Idempotency-Key header; webhooks default to a hash of their body), and each
@@ -31,6 +32,9 @@ import { hasRecipientPlaceholder, personalizeHtml } from "../_shared/recipient.t
 import {
   API_DAILY_LIMIT, API_KEY_PATTERN, SITE_URL, cleanName, extractRecipientName, institutionFromDsl, newDiplomaId,
 } from "../_shared/publicApi.ts";
+import { validateTemplateImport, MAX_TEMPLATE_BYTES } from '../_shared/templateImport.ts';
+
+const MAX_TEMPLATES = 500;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,12 +50,18 @@ const admin = () =>
   createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 
 type Db = ReturnType<typeof admin>;
-interface Caller { userId: string; keyId: string }
+interface Caller { userId: string; keyId: string | null }
 
 async function authenticate(db: Db, req: Request, url: URL, allowQueryKey: boolean): Promise<Caller | null> {
   const header = req.headers.get('Authorization') ?? '';
   const presented = header.startsWith('Bearer ') ? header.slice(7).trim() : allowQueryKey ? (url.searchParams.get('key') ?? '') : '';
-  if (!API_KEY_PATTERN.test(presented)) return null;
+  if (!API_KEY_PATTERN.test(presented)) {
+    // A signed-in person's own session token works too (never in a URL): that
+    // is how certera's MCP tools act for the person who connected them.
+    if (!header.startsWith('Bearer ') || presented.split('.').length !== 3) return null;
+    const { data: session } = await db.auth.getUser(presented);
+    return session?.user ? { userId: session.user.id, keyId: null } : null;
+  }
   const { data } = await db.from('api_keys').select('id, user_id').eq('token_hash', await sha256Hex(presented)).maybeSingle();
   if (!data) return null;
   await db.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
@@ -91,10 +101,10 @@ async function issue(db: Db, caller: Caller, input: {
 
   // The template must be the caller's own design.
   const { data: tpl } = await db.from('diploma_sessions')
-    .select('id, diploma_html, diploma_css, diploma_dsl').eq('id', input.templateId).eq('user_id', caller.userId).maybeSingle();
+    .select('id, diploma_html, diploma_css, diploma_dsl, institution_name').eq('id', input.templateId).eq('user_id', caller.userId).maybeSingle();
   if (!tpl || !tpl.diploma_html) return fail(404, 'template_not_found', 'No design with that id in your account.');
 
-  const institutionName = input.institutionOverride ?? institutionFromDsl(tpl.diploma_dsl);
+  const institutionName = input.institutionOverride ?? cleanName(tpl.institution_name) ?? institutionFromDsl(tpl.diploma_dsl);
   if (!institutionName) return fail(400, 'institution_required', 'This design has no institution name; send institution_name.');
 
   // Idempotency: claim the key first, so two concurrent retries cannot both sign.
@@ -186,17 +196,46 @@ serve(async (req) => {
 
     if (req.method === 'GET' && path === '/v1/templates') {
       const { data, error } = await db.from('diploma_sessions')
-        .select('id, title, diploma_html, diploma_dsl, updated_at').eq('user_id', caller.userId).order('updated_at', { ascending: false }).limit(100);
+        .select('id, title, diploma_html, diploma_dsl, institution_name, diploma_format, updated_at').eq('user_id', caller.userId).order('updated_at', { ascending: false }).limit(100);
       if (error) throw new Error(error.message);
       return json({
         templates: (data ?? []).filter((t) => t.diploma_html).map((t) => ({
           id: t.id,
           title: t.title,
-          institution_name: institutionFromDsl(t.diploma_dsl),
+          institution_name: cleanName(t.institution_name) ?? institutionFromDsl(t.diploma_dsl),
+          format: t.diploma_format,
           has_recipient_placeholder: hasRecipientPlaceholder(t.diploma_html),
           updated_at: t.updated_at,
         })),
       });
+    }
+
+    // Bring a design made elsewhere: it becomes a template to issue from.
+    if (req.method === 'POST' && path === '/v1/templates') {
+      const raw = await req.text();
+      if (raw.length > 2 * MAX_TEMPLATE_BYTES + 10_000) return fail(413, 'too_large', 'The request body is too large.');
+      let body: unknown;
+      try { body = raw ? JSON.parse(raw) : {}; } catch { return fail(400, 'invalid_json', 'The request body must be JSON.'); }
+      const checked = validateTemplateImport(body);
+      if (checked.ok === false) return fail(400, checked.code, checked.message);
+      const { count } = await db.from('diploma_sessions').select('id', { count: 'exact', head: true }).eq('user_id', caller.userId);
+      if ((count ?? 0) >= MAX_TEMPLATES) return fail(409, 'too_many_templates', `An account holds at most ${MAX_TEMPLATES} designs. Delete some in the app first.`);
+      const t = checked.value;
+      const { data: row, error } = await db.from('diploma_sessions').insert({
+        user_id: caller.userId, title: t.title, diploma_html: t.html, diploma_css: t.css,
+        diploma_dsl: null, diploma_format: t.format, institution_name: t.institutionName, messages: [],
+      }).select('id, title, updated_at').single();
+      if (error || !row) throw new Error('Failed to store template: ' + (error?.message ?? 'no row'));
+      const hasPlaceholder = hasRecipientPlaceholder(t.html);
+      return json({
+        id: row.id,
+        title: row.title,
+        institution_name: t.institutionName,
+        format: t.format,
+        has_recipient_placeholder: hasPlaceholder,
+        updated_at: row.updated_at,
+        ...(hasPlaceholder ? {} : { warning: 'The design has no {{recipient_name}} placeholder, so the name will be recorded but not printed on the certificate.' }),
+      }, 201);
     }
 
     // Newest first. Automation tools poll this to trigger on new certificates.

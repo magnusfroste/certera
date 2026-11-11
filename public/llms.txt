@@ -9,4 +9,5 @@ certera.ink lets schools, course providers and HR teams design branded, animated
 - [Home](https://www.certera.ink/)
 - [Demo](https://www.certera.ink/demo)
 - [Certificate API for course providers](https://www.certera.ink/developers): issue signed, verifiable certificates with one request or a course-completed webhook
+- MCP server for AI assistants (https://jiokwdsnmgmcjoyxrwax.supabase.co/functions/v1/mcp, sign in with a certera account): save a finished HTML/CSS certificate design as a template and issue signed certificates from it
 - [Verify a certificate](https://www.certera.ink/verify)
