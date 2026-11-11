@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MakeYourOwnCta } from '@/components/MakeYourOwnCta';
 import { IssuerStamp } from '@/components/IssuerStamp';
 import { Link, useParams } from 'react-router-dom';
-import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, Linkedin, QrCode, Shield } from 'lucide-react';
+import { Award, Calendar, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, Hash, Linkedin, Loader2, QrCode, Shield } from 'lucide-react';
 import { fetchPublicDiploma, type PublicDiploma } from '@/services/publicDiploma';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -12,6 +12,7 @@ import { DiplomaFrame } from '@/components/DiplomaFrame';
 import { toast } from 'sonner';
 import { certificationName, linkedInAddToProfileUrl } from '@/lib/linkedin';
 import { SITE_URL } from '@/lib/siteUrl';
+import { downloadDiplomaPdf } from '@/lib/diplomaPdf';
 
 interface SealData {
   hederaTxId?: string;
@@ -45,6 +46,7 @@ const Diploma = () => {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!diplomaId) { setError('Diploma not found'); setIsLoading(false); return; }
@@ -65,6 +67,25 @@ const Diploma = () => {
       toast.success('Link copied');
       window.setTimeout(() => setCopied(false), 2000);
     } catch { toast.error('Could not copy link'); }
+  };
+
+  // The PDF carries the verification QR code, so a printed copy can be checked.
+  const downloadPdf = async () => {
+    if (!diplomaData) return;
+    setDownloading(true);
+    try {
+      await downloadDiplomaPdf({
+        html: diplomaData.diploma_html,
+        css: diplomaData.diploma_css,
+        diplomaId: diplomaData.blockchain_id,
+        verificationUrl: `${SITE_URL}/verify/${diplomaData.blockchain_id}`,
+      });
+    } catch (e) {
+      console.error('Error generating PDF:', e);
+      toast.error('Could not create the PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const prepared = useMemo(() => {
@@ -177,9 +198,9 @@ const Diploma = () => {
                 <p className="mt-2 text-center text-xs text-muted-foreground">Scan to verify</p>
               </PopoverContent>
             </Popover>
-            {diplomaData.diploma_url && (
-              <Button variant="outline" size="sm" asChild><a href={diplomaData.diploma_url} download><Download />Download</a></Button>
-            )}
+            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={downloading}>
+              {downloading ? <Loader2 className="animate-spin" /> : <Download />}{downloading ? 'Preparing…' : 'Download PDF'}
+            </Button>
           </div>
 
           <MakeYourOwnCta from="diploma" />

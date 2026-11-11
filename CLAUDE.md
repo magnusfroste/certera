@@ -110,9 +110,13 @@ deployed edge function, so it works end-to-end from a dev server.
   @supabase/supabase-js and recharts). Don't lower them; bump to the newest
   patched release instead. The security scanner reads `bun.lock`, so after any
   dependency change run `bun install` (not only `npm install`) and re-check.
-- `jspdf` is kept on the latest major (4.x) — the PDF export in `SharePanel`
-  (`new jsPDF(...)` + `addImage` + `save`) was re-verified after each major
-  bump by driving the signed-in app and checking the downloaded file.
+- `jspdf` is kept on the latest major (4.x) — the PDF export lives in
+  `src/lib/diplomaPdf.ts` (used by `SharePanel` and the public `/diploma/:id`
+  page; `new jsPDF(...)` + `addImage` + `save`). Re-verify after each major
+  bump by downloading from `/diploma/:id` and checking the file. It lays the
+  stored HTML out in an iframe sandboxed without `allow-scripts` and draws on
+  a canvas created in that frame (canvas text uses the fonts of the document
+  that owns the canvas) — keep both.
 
 ## Conventions
 
