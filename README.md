@@ -30,7 +30,7 @@ AI-generated diplomas and certificates with blockchain-backed verification. Desc
 ### Prerequisites
 
 - Node.js v18 or higher
-- npm (or bun — a `bun.lockb` is included)
+- bun (the lockfile is `bun.lock`; npm works too, but has no lockfile here)
 - A Supabase project (for self-hosting)
 
 ### Installation
