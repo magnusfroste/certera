@@ -6,3 +6,5 @@
 - Reuse SharePanel for post-sign actions and the Share tab to keep export and sharing behaviour consistent.
 - On narrow screens the studio switches between Chat and Diploma views instead of squeezing a horizontal split; both views keep the same design state.- The app MCP server lives in `src/lib/mcp/` (one tool per file, OAuth via the backend's auth issuer, caller-scoped client under RLS); the `supabase/functions/mcp` function is generated — never hand-edit it.
 - Fix generated-bundle complaints (the `mcp` function's `process.env` lookup, its `var` style) in the typecheck shim `supabase/functions/deno-shim.d.ts` and in `eslint.config.js` ignores — never in the generated file.
+- First-certificate onboarding uses an account-scoped browser-local organization default and existing signed-record counts; organization setup is not issuer verification and introduces no new database entities.
+- Onboarding personalizes a copied template header before calling the existing applyRecipe flow, preserving curated recipes and signing behaviour.

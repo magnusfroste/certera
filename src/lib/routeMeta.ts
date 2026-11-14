@@ -18,11 +18,11 @@ export interface RouteMeta {
 }
 
 const DEFAULT_DESCRIPTION =
-  'Design diplomas and certificates with AI in seconds, then issue them with a public verification link recorded on the Hedera blockchain. Free to try, no account needed.';
+  'Create diplomas and certificates with AI or curated templates. Anchor their fingerprints on the Hedera blockchain and share a public verification link.';
 
 const PUBLIC: Record<string, Omit<RouteMeta, 'canonical' | 'noindex'>> = {
   '/': {
-    title: 'certera.ink — AI diploma & certificate maker with blockchain verification',
+    title: 'certera.ink — Verifiable diplomas & certificates on Hedera',
     description: DEFAULT_DESCRIPTION,
   },
   '/demo': {

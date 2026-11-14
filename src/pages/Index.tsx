@@ -19,6 +19,9 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { StudioProgress } from "@/components/StudioProgress";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
+import { FirstCertificateGuide } from '@/components/FirstCertificateGuide';
+import { useFirstCertificate } from '@/hooks/useFirstCertificate';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 const IndexContent = ({ user, isGuest, guestAccess }: {
   user: User | null;
@@ -44,6 +47,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
   const hasCanvas = !!diplomaHtml;
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState('diploma');
+  const onboarding = useFirstCertificate(user?.id);
 
   return (
     <div className="h-[100dvh] flex w-full">
@@ -57,11 +61,11 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {isGuest && <GuestBanner remainingGenerations={guestAccess.remainingGenerations} maxGenerations={guestAccess.maxGenerations} />}
 
-        {/* Header - only for guests or when canvas is visible */}
-        {(isGuest || hasCanvas) && (
+        {/* Keep navigation accessible before and after the first design. */}
           <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
+                {!isGuest && <SidebarTrigger />}
                 {isGuest && (
                   <>
                     <div className="bg-primary/15 border border-primary/20 p-1.5 rounded-lg">
@@ -71,6 +75,7 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
                   </>
                 )}
                 {hasCanvas && <StudioProgress />}
+                {!isGuest && !hasCanvas && <span className="text-sm font-medium">certera.ink</span>}
               </div>
               <div className="flex items-center gap-3">
                 {!isGuest && hasCanvas && <BlockchainMenu />}
@@ -82,14 +87,21 @@ const IndexContent = ({ user, isGuest, guestAccess }: {
               </div>
             </div>
           </div>
+        {!isGuest && onboarding.active && hasCanvas && (
+          <div role="status" className="border-b border-border px-4 py-3 text-sm">
+            <span className="font-medium">03 · Issue your first certificate</span>
+            <p className="text-muted-foreground mt-1">Review your design, then open Sign to enter the recipient and issue it on Hedera.</p>
+          </div>
         )}
 
         {/* Main Content: 3 states */}
         <div className="flex-1 min-h-0">
           {!hasStarted ? (
             /* State 1: Landing - centered input */
-            <div className="h-full animate-fade-in">
-              <ChatLanding isGuest={isGuest} guestAccess={isGuest ? guestAccess : undefined} />
+            <div className="h-full animate-fade-in overflow-y-auto">
+              {!isGuest && onboarding.loading ? <p className="p-6 text-sm text-muted-foreground" role="status">Preparing your studio…</p> : onboarding.active ? (
+                <FirstCertificateGuide organization={onboarding.organization} onSave={onboarding.saveOrganization} onSkip={onboarding.skip} />
+              ) : <ChatLanding isGuest={isGuest} guestAccess={isGuest ? guestAccess : undefined} />}
             </div>
           ) : !hasCanvas ? (
             /* State 2: Chat only - generating, no canvas yet */

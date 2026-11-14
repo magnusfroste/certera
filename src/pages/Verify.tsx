@@ -110,7 +110,7 @@ const Verify = () => {
         <VerificationResult result={result} loading={isVerifying} />
 
         <section className="mx-auto max-w-xl py-8">
-          <h1 className="text-2xl font-semibold">Verify another diploma</h1>
+          <h1 className="text-2xl font-semibold">{urlDiplomaId ? 'Verify another diploma' : 'Verify a diploma or certificate'}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Enter the diploma ID and recipient name exactly as shown.</p>
           <div className="mt-5 space-y-4">
             <div><Label htmlFor="diplomaId">Diploma ID</Label><Input id="diplomaId" value={diplomaId} onChange={(event) => setDiplomaId(event.target.value)} placeholder="DIP_xxxxx_xxxxxx" disabled={isVerifying} /></div>

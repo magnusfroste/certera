@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Award, ArrowRight, CheckCircle2, PenLine, ShieldCheck, Share2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Award, ArrowRight, ShieldCheck, PenLine, Share2, Search } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { DiplomaFrame } from "@/components/DiplomaFrame";
 import { DIPLOMA_RECIPES } from "@/constants/diplomaRecipes";
 import { renderDSL } from "@/diploma-dsl/render";
@@ -9,11 +12,14 @@ const recipe = DIPLOMA_RECIPES.find((item) => item.id === 'classic-university');
 const sample = recipe ? renderDSL(recipe.dsl) : null;
 const steps = [
   { icon: PenLine, title: 'Design', description: 'Start with a template. Make it your own.' },
-  { icon: ShieldCheck, title: 'Sign on Hedera', description: 'A permanent record of your diploma’s authenticity.' },
+  { icon: ShieldCheck, title: 'Sign on Hedera', description: 'Add the recipient. Anchor the certificate’s fingerprint on Hedera.' },
   { icon: Share2, title: 'Share & verify', description: 'One link. Anyone can check it. No account needed.' },
 ];
 
-const Landing = () => (
+const Landing = () => {
+  const [certificateId, setCertificateId] = useState('');
+  const navigate = useNavigate();
+  return (
   <div className="min-h-screen bg-background text-foreground">
     <nav aria-label="Main navigation" className="border-b border-border">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-8 py-4">
@@ -21,7 +27,7 @@ const Landing = () => (
           <Award className="size-5 text-primary" />certera.ink
         </Link>
         <div className="flex items-center gap-1 sm:gap-3">
-          <Button variant="ghost" size="sm" asChild><Link to="/developers">API</Link></Button>
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild><Link to="/developers">API</Link></Button>
           <Button variant="ghost" size="sm" asChild><Link to="/verify">Verify</Link></Button>
           <Button variant="outline" size="sm" asChild><Link to="/auth">Sign in</Link></Button>
         </div>
@@ -30,27 +36,33 @@ const Landing = () => (
     <main>
       <section className="px-4 sm:px-8 pt-10 sm:pt-14 pb-8 text-center">
         <p className="text-xs font-mono text-muted-foreground mb-4">DESIGNED BY YOU. VERIFIED ON HEDERA.</p>
-        <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">Diplomas that earn trust.</h1>
+        <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">certera.ink<br /><span className="text-2xl sm:text-4xl">Verifiable diplomas & certificates.</span></h1>
         <p className="max-w-lg mx-auto mt-4 text-sm sm:text-base text-muted-foreground leading-relaxed">
-          Create a beautiful diploma with your AI diploma agent.<br className="hidden sm:block" /> Sign it on Hedera. Share proof that lasts.
+          Design with AI or start from a template. Anchor your certificate’s fingerprint on the Hedera blockchain and share a link anyone can verify.
         </p>
         <div className="flex justify-center flex-wrap gap-3 mt-6 mb-8 sm:mb-10">
-          <Button asChild><Link to="/demo">Design a diploma <ArrowRight className="size-4 ml-2" /></Link></Button>
-          <Button variant="outline" asChild><Link to="/auth?mode=signup">Start issuing</Link></Button>
+          <Button asChild><Link to="/auth?mode=signup">Create an account <ArrowRight className="size-4 ml-2" /></Link></Button>
+          <Button variant="outline" asChild><Link to="/demo">Try the demo</Link></Button>
         </div>
+        <form aria-label="Verify a certificate" className="max-w-xl mx-auto mb-8 sm:mb-10 border-y border-border py-5 text-left" onSubmit={(event) => { event.preventDefault(); if (certificateId.trim()) navigate(`/verify/${encodeURIComponent(certificateId.trim())}`); }}>
+          <Label htmlFor="landing-certificate-id" className="flex items-center gap-2 mb-3"><ShieldCheck className="size-4 text-primary" />Have a certificate? Verify it.</Label>
+          <div className="flex gap-2"><Input id="landing-certificate-id" className="min-w-0" placeholder="Certificate ID (DIP_…)" value={certificateId} onChange={(event) => setCertificateId(event.target.value)} required /><Button type="submit" disabled={!certificateId.trim()}><Search className="size-4 sm:mr-2" /><span className="hidden sm:inline">Verify</span><span className="sr-only sm:hidden">Verify certificate</span></Button></div>
+          <p className="mt-2 text-xs text-muted-foreground">Check a registered record. No account needed.</p>
+        </form>
         {sample && (
           <figure className="max-w-[800px] mx-auto text-left">
             <div className="landing-document overflow-hidden rounded-sm">
               <DiplomaFrame html={sample.html} css={sample.css} title="Sample diploma — Ashford University" minHeight={0} fitToWidth />
             </div>
             <figcaption className="flex flex-wrap justify-between items-center gap-3 mt-4 text-xs sm:text-sm">
-              <div className="flex items-center gap-2"><CheckCircle2 className="size-5 text-success shrink-0" /><span className="font-medium">Authentic diploma<span className="block text-xs text-muted-foreground font-normal">Registered on Hedera when signed</span></span></div>
-              <span className="text-xs text-muted-foreground">Sample · Classic University</span>
+              <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary shrink-0" /><span className="font-medium">Designed here. Verifiable when issued.<span className="block text-xs text-muted-foreground font-normal">Registration happens when you sign on Hedera.</span></span></div>
+              <span className="text-xs text-muted-foreground">Illustrative template · Not an issued certificate</span>
             </figcaption>
           </figure>
         )}
       </section>
       <section aria-label="Design, sign and share" className="border-y border-border bg-card/50">
+        <h2 className="max-w-5xl mx-auto px-6 sm:px-8 pt-8 text-lg font-semibold">How it works</h2>
         <ol className="max-w-5xl mx-auto grid sm:grid-cols-3 gap-7 sm:gap-8 px-6 sm:px-8 py-10 sm:py-12">
           {steps.map((step, index) => (
             <li key={step.title} className="flex gap-4">
@@ -75,7 +87,7 @@ const Landing = () => (
             <h2 className="text-2xl font-semibold leading-snug">You run the course.<br />The certificates issue themselves.</h2>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
               Connect your course platform with one API call or a “course completed” webhook. Every learner gets a signed
-              certificate with a link anyone can verify — free.
+              certificate with a link anyone can verify.
             </p>
             <Button className="mt-5" asChild><Link to="/developers">See the API <ArrowRight className="size-4 ml-2" /></Link></Button>
           </div>
@@ -100,6 +112,7 @@ const Landing = () => (
       </div>
     </footer>
   </div>
-);
+  );
+};
 
 export default Landing;

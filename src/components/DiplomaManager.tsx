@@ -37,7 +37,7 @@ const StatsBar = ({ diplomas }: { diplomas: SignedDiploma[] }) => {
   }, [diplomas]);
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {[
         { label: 'Total Diplomas', value: stats.total, icon: Award },
         { label: 'Institutions', value: stats.institutions, icon: Building2 },
@@ -66,9 +66,9 @@ const EmptyState = () => {
       </div>
       <h3 className="text-xl font-semibold mb-2">No signed diplomas yet</h3>
       <p className="text-muted-foreground mb-6 max-w-sm">
-        Create and sign your first diploma to see it here.
+        Start in the studio: set up your organization, choose a template, then enter a recipient in the Sign tab. Your issued certificates will appear here.
       </p>
-      <Button onClick={() => navigate('/app')}>Create Your First Diploma</Button>
+      <Button onClick={() => navigate('/app')}>Create your first certificate</Button>
     </div>
   );
 };
