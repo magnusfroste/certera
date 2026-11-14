@@ -16,7 +16,7 @@ import {
 } from "../_shared/customProviders.ts";
 import { GUEST_ACCESS_KEY, parseGuestDailyLimit } from "../_shared/guestAccess.ts";
 import { removeUnknownPlaceholders } from "../_shared/diplomaPlaceholders.ts";
-import { pickBrandColors, extractBrandFromHtml, type BrandData } from "../_shared/brandColors.ts";
+import { pickBrandColors, extractBrandFromHtml, chooseScrape, brandAfterEdit, type BrandData } from "../_shared/brandColors.ts";
 import { FALLBACK_POLICY_KEY, parseFallbackBudget, startOfUtcDay, estimatedSpendUsd, isPaidProvider, type UsageRow } from "../_shared/fallbackBudget.ts";
 
 // ── Shared request/DSL types ──
@@ -465,7 +465,10 @@ const scrapeWithFirecrawl = async (url: string): Promise<BrandData | null> => {
 // Direct fetch fallback (no JS rendering)
 const scrapeDirect = async (url: string): Promise<BrandData | null> => {
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)' } });
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DiplomaBot/1.0)', 'Accept': 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(15000),
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return extractBrandFromHtml(await r.text(), url);
   } catch (e) {
@@ -479,8 +482,15 @@ const scrapeWebsiteData = async (url: string): Promise<BrandData | null> => {
     console.error('Scrape: URL is not a public http(s) address');
     return null;
   }
-  // Prefer Firecrawl when configured; fall back to a direct fetch.
-  return (await scrapeWithFirecrawl(url)) || (await scrapeDirect(url));
+  // Both at once, and the read that found the site's colours wins: Firecrawl
+  // alone sometimes came back with a page without them (a bot wall, or an
+  // empty render), and the direct fetch was then never tried, so a school's
+  // diploma came out in a stock palette with an invented founding year.
+  const [firecrawl, direct] = await Promise.all([scrapeWithFirecrawl(url), scrapeDirect(url)]);
+  const describe = (d: BrandData | null) => (d ? `"${d.brandName}", ${d.colors.length} colours` : 'nothing');
+  const chosen = chooseScrape(firecrawl, direct);
+  console.log(`Website read: firecrawl ${describe(firecrawl)}; direct ${describe(direct)}; using ${chosen === null ? 'none' : chosen.colors === direct?.colors ? 'direct' : 'firecrawl'}`);
+  return chosen;
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -816,6 +826,20 @@ serve(async (req) => {
       // The site's own picks win: they are the same on every import.
       dsl.brand = { ...own, ...pickBrandColors(ws.colors, bgColor) };
       if (!dsl.brand.primaryColor && !dsl.brand.accentColor) delete dsl.brand;
+    }
+    // A change in words keeps the diploma's colours unless it names new ones,
+    // and colours it names are drawn even when the model kept the palette's.
+    if (dslIteration && dsl && typeof dsl === 'object') {
+      const palette = PALETTES[dsl.palette ?? ''] || PALETTES['ivory-navy'];
+      const bgColor = BG_REPRESENTATIVE[dsl.background?.style || palette.bg] || '#ffffff';
+      const brand = brandAfterEdit({
+        modelBrand: dsl.brand,
+        previousBrand: (currentDsl as DiplomaDSL).brand,
+        request: lastUserText,
+        background: bgColor,
+      });
+      if (brand.primaryColor || brand.accentColor) dsl.brand = { ...(dsl.brand?.name ? { name: dsl.brand.name } : {}), ...brand };
+      else delete dsl.brand;
     }
     applyDeterministicFixes(dsl);
 
