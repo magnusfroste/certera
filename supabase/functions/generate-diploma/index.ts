@@ -16,6 +16,7 @@ import {
 } from "../_shared/customProviders.ts";
 import { GUEST_ACCESS_KEY, parseGuestDailyLimit } from "../_shared/guestAccess.ts";
 import { removeUnknownPlaceholders } from "../_shared/diplomaPlaceholders.ts";
+import { pickBrandColors, extractBrandFromHtml, type BrandData } from "../_shared/brandColors.ts";
 import { FALLBACK_POLICY_KEY, parseFallbackBudget, startOfUtcDay, estimatedSpendUsd, isPaidProvider, type UsageRow } from "../_shared/fallbackBudget.ts";
 
 // ── Shared request/DSL types ──
@@ -106,6 +107,14 @@ const DSL_JSON_SCHEMA = {
   type: 'object',
   properties: {
     palette: { type: 'string', enum: PALETTE_IDS, description: 'Curated color palette (decides bg + primary + accent)' },
+    brand: {
+      type: 'object',
+      description: "A brand's own colours, drawn instead of the palette's primary and accent; the palette still decides the background",
+      properties: {
+        primaryColor: { type: 'string', description: 'Exact hex such as #0F3D3E: headings, borders, the recipient name. Must be dark enough to read on the background.' },
+        accentColor: { type: 'string', description: 'Exact hex such as #E3A23B: seal, ornaments, underlines.' },
+      },
+    },
     typography: {
       type: 'object',
       properties: { pair: { type: 'string', enum: TYPOGRAPHY_IDS } },
@@ -181,6 +190,7 @@ function dslSystemPrompt(variant: number): string {
 
 DESIGN HEURISTIC:
 - Choose ONE palette that matches the requested vibe. The palette determines bg + colors automatically.
+- BRAND COLOURS: when the request gives a brand's colours (a website's colours below) or names colours ("deep teal and warm amber"), also set brand.primaryColor (headings, borders: the brand's deep, readable colour) and brand.accentColor (seal, ornaments: its signature highlight) as exact hex values, and pick the palette whose background suits them.
 - Choose ONE typography pair that fits the era/feel (serif-classic for formal, sans-modern for tech, display-editorial for premium, script-romantic for arts, mono-tech for dev, mixed-contrast for bold).
 - Choose ONE composition: classic-stack (safe default), banner-top (modern enterprise), medallion-center (award-ceremony), split-horizontal (landscape modern), corner-accent (minimal premium).
 - Pick 0–2 decorations max. They are overlays — do not pick more than 2 or it gets cluttered.
@@ -219,6 +229,7 @@ RULES:
 - Apply ONLY the changes the user asks for. Keep every other field exactly as it is in the current design.
 - Text changes (title, description, names, dates) go in the corresponding DSL fields.
 - Style changes are made by picking different predefined blocks — never invent values outside the schema.
+- Colours the user names ("deep sea teal and warm amber", "our blue") go in brand.primaryColor / brand.accentColor as exact hex values; keep the palette (and its background) unless the user asks for another background. Keep an existing brand as it is unless the user changes its colours.
 - Keep body.recipientName unchanged unless the user explicitly asks to change the recipient.
 - Do NOT include customCss unless absolutely required.
 - Available palettes: ${PALETTE_IDS.join(', ')}.
@@ -424,29 +435,6 @@ const isSafePublicUrl = (raw: string): boolean => {
   }
 };
 
-interface BrandData { brandName: string; colors: string[]; fonts: string[] }
-
-// Extract brand colors/fonts/name from raw HTML (+ optional pre-parsed metadata)
-const extractBrandFromHtml = (
-  html: string,
-  url: string,
-  meta?: { title?: string; siteName?: string },
-): BrandData => {
-  const colors = html.match(/#[0-9a-fA-F]{3,6}/g) || [];
-  const fonts = new Set<string>();
-  for (const m of html.matchAll(/font-family\s*:\s*([^;]+)/gi)) {
-    const f = m[1].replace(/['"]/g, '').split(',')[0].trim();
-    if (f && f !== 'inherit') fonts.add(f);
-  }
-  const title = meta?.title || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '';
-  const siteName = meta?.siteName || html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"/i)?.[1] || '';
-  return {
-    brandName: siteName || title.split(/[-|–—]/)[0].trim() || new URL(url).hostname.replace('www.', ''),
-    colors: [...new Set(colors)].slice(0, 5),
-    fonts: [...fonts].slice(0, 3),
-  };
-};
-
 // Scrape via Firecrawl (renders JS, cleaner metadata); returns null if unavailable/failed
 const scrapeWithFirecrawl = async (url: string): Promise<BrandData | null> => {
   const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
@@ -455,12 +443,14 @@ const scrapeWithFirecrawl = async (url: string): Promise<BrandData | null> => {
     const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ url, formats: ['html'], onlyMainContent: false, timeout: 20000 }),
+      // rawHtml keeps the <style> blocks, where a site's colours and fonts
+      // live; the cleaned html has only inline styles.
+      body: JSON.stringify({ url, formats: ['rawHtml', 'html'], onlyMainContent: false, timeout: 20000 }),
     });
     if (!r.ok) throw new Error(`Firecrawl HTTP ${r.status}: ${(await r.text()).substring(0, 200)}`);
     const data = await r.json();
     if (!data?.success || !data?.data) throw new Error('Firecrawl returned no data');
-    const html: string = data.data.html || data.data.rawHtml || '';
+    const html: string = data.data.rawHtml || data.data.html || '';
     const md = data.data.metadata || {};
     return extractBrandFromHtml(html, url, {
       title: md.title || md.ogTitle,
@@ -607,6 +597,8 @@ serve(async (req) => {
     let systemPrompt: string;
     let aiMessages: AIMessage[];
     let structured = true;
+    // The website a URL import read; its colours become the diploma's own.
+    let ws: BrandData | null = null;
 
     if (dslIteration) {
       systemPrompt = dslIterationSystemPrompt(currentDsl as DiplomaDSL);
@@ -625,7 +617,7 @@ serve(async (req) => {
         ],
       }];
     } else if (requestType === 'url') {
-      const ws = await scrapeWebsiteData(url);
+      ws = await scrapeWebsiteData(url);
       systemPrompt = dslSystemPrompt(variant) + (ws ? `\n\nBRAND: ${ws.brandName}\nColors: ${ws.colors.join(', ')}\nFonts: ${ws.fonts.join(', ')}` : '');
       aiMessages = [{ role: 'user', content: `Create a diploma for the brand at ${url}.` }];
     } else {
@@ -811,6 +803,19 @@ serve(async (req) => {
     const pageFormat = requestedFormat(lastUserText) ?? (isDiplomaFormat(diplomaFormat) ? diplomaFormat : null);
     if (pageFormat && dsl && typeof dsl === 'object') {
       dsl.layout = { ...(dsl.layout ?? {}), orientation: pageFormat };
+    }
+    // A design made from a website is drawn in the website's own colours. The
+    // model only picks the nearest of the curated palettes, which lost a
+    // school's colours (Kestrel Bay's teal and amber came out navy and steel
+    // blue), so the brand colours are taken from the site itself.
+    if (ws?.colors?.length && dsl && typeof dsl === 'object') {
+      const palette = PALETTES[dsl.palette ?? ''] || PALETTES['ivory-navy'];
+      const bgColor = BG_REPRESENTATIVE[dsl.background?.style || palette.bg] || '#ffffff';
+      const own = Object.fromEntries(Object.entries(dsl.brand ?? {})
+        .filter(([, v]) => typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)));
+      // The site's own picks win: they are the same on every import.
+      dsl.brand = { ...own, ...pickBrandColors(ws.colors, bgColor) };
+      if (!dsl.brand.primaryColor && !dsl.brand.accentColor) delete dsl.brand;
     }
     applyDeterministicFixes(dsl);
 
