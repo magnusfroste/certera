@@ -9,3 +9,8 @@
 - [x] Clarify studio progress, recipient entry and signed sharing actions.
 - [x] Safeguard shared DSL text contrast and add regression tests.
 - [x] Check desktop and 375 px mobile, including authenticated studio and public verification.
+
+## Launch polish
+- [ ] Clarify landing, signup and public verification entry.
+- [ ] Add first-time organization, template and issuing guidance without new database structures.
+- [ ] Check SEO assets and desktop / 375 px layouts.
