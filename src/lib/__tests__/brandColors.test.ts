@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractBrandFromHtml, pickBrandColors } from '../../../supabase/functions/_shared/brandColors';
+import { brandAfterEdit, brandFromWords, chooseScrape, extractBrandFromHtml, pickBrandColors } from '../../../supabase/functions/_shared/brandColors';
 import { renderDSL, type DiplomaDSL } from '../../../supabase/functions/_shared/diplomaRenderer';
 
 // A school site's colours sit in a <style> block as CSS variables and rules,
@@ -77,5 +77,75 @@ describe('a diploma in brand colours', () => {
     } as DiplomaDSL);
     expect(css).toContain('.diploma-header .institution{color:#0F3D3E}');
     expect(css).toMatch(/\.diploma-seal\{[^}]*border:2px solid #E3A23B/);
+  });
+});
+
+describe('two reads of one website', () => {
+  const site = { brandName: 'Kestrel Bay Academy', colors: ['#0F3D3E', '#E3A23B', '#7FB8B0'], fonts: ['Fraunces'] };
+  const wall = { brandName: 'Just a moment...', colors: ['#313131'], fonts: [] };
+  const empty = { brandName: 'Kestrel Bay Academy', colors: [], fonts: [] };
+
+  it('takes the read with the colours when the other came back from a bot wall', () => {
+    expect(chooseScrape(wall, site)).toEqual(site);
+  });
+
+  it('takes the read with the colours when the other found none', () => {
+    expect(chooseScrape(empty, site)?.colors).toEqual(site.colors);
+  });
+
+  it('gives nothing when neither read the site', () => {
+    expect(chooseScrape(wall, null)).toBeNull();
+    expect(chooseScrape(null, null)).toBeNull();
+  });
+});
+
+describe('colours named in words', () => {
+  it('draws "deep sea teal and warm amber" as a teal primary and an amber accent', () => {
+    const { primaryColor, accentColor } = brandFromWords(
+      'Make it bold like our website: deep sea teal and warm amber, a classic serif title "Graduation 2026"', COOL_BACKGROUND);
+    expect(primaryColor).toMatch(/^#0[0-9A-F]4[0-9A-F]4[0-9A-F]$/); // a deep teal
+    expect(accentColor).toBe('#D9962B');
+  });
+
+  it('takes hex values as they are', () => {
+    expect(brandFromWords('use #0F3D3E with #E3A23B', COOL_BACKGROUND)).toEqual({ primaryColor: '#0F3D3E', accentColor: '#E3A23B' });
+  });
+
+  it('does not take a person\'s name for a colour', () => {
+    expect(brandFromWords('Signed by Amber Lee, for Mary Rose', COOL_BACKGROUND)).toEqual({});
+  });
+
+  it('names no colour in a request without one', () => {
+    expect(brandFromWords('Sign it by Dr. Mira Holm, Principal', COOL_BACKGROUND)).toEqual({});
+  });
+
+  it('makes a light colour readable before it carries text', () => {
+    const { primaryColor } = brandFromWords('pale lavender and gold', COOL_BACKGROUND);
+    expect(primaryColor).toBeDefined();
+  });
+});
+
+describe('colours after a change in words', () => {
+  const school = { primaryColor: '#0F3D3E', accentColor: '#E3A23B' };
+
+  it('keeps the website\'s colours on an edit that does not name colours', () => {
+    expect(brandAfterEdit({ previousBrand: school, request: 'Sign it by Dr. Mira Holm', background: COOL_BACKGROUND })).toEqual(school);
+  });
+
+  it('draws the colours a request names even when the model kept the palette', () => {
+    const b = brandAfterEdit({ request: 'deep sea teal and warm amber', background: COOL_BACKGROUND });
+    expect(b.accentColor).toBe('#D9962B');
+    expect(b.primaryColor).toBeDefined();
+  });
+
+  it('lets named colours replace the earlier ones', () => {
+    const b = brandAfterEdit({ previousBrand: school, request: 'make it burgundy', background: COOL_BACKGROUND });
+    expect(b.primaryColor).not.toBe('#0F3D3E');
+  });
+
+  it('keeps a valid brand the model chose, and drops one that is not a colour', () => {
+    expect(brandAfterEdit({ modelBrand: { primaryColor: '#123456' }, previousBrand: school, request: 'new title', background: COOL_BACKGROUND }))
+      .toEqual({ primaryColor: '#123456', accentColor: '#E3A23B' });
+    expect(brandAfterEdit({ modelBrand: { primaryColor: 'teal' }, request: 'new title', background: COOL_BACKGROUND })).toEqual({});
   });
 });
