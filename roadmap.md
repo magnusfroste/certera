@@ -11,6 +11,7 @@
 - [x] Check desktop and 375 px mobile, including authenticated studio and public verification.
 
 ## Launch polish
-- [ ] Clarify landing, signup and public verification entry.
-- [ ] Add first-time organization, template and issuing guidance without new database structures.
-- [ ] Check SEO assets and desktop / 375 px layouts.
+- [x] Clarify landing, signup and public verification entry.
+- [x] Add first-time organization, template and issuing guidance without new database structures.
+- [x] Check SEO assets and desktop / 375 px public layouts; 138 tests pass.
+- [ ] Check signed-in onboarding and dashboard at 375 px — blocked: no available user session; temporary-user approval unavailable.
