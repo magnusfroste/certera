@@ -9,6 +9,7 @@ import { DiplomaProvider } from '@/contexts/DiplomaContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 const SignedContent = ({ user }: { user: User }) => {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ const SignedContent = ({ user }: { user: User }) => {
         userEmail={user.email || ''}
         userName={user.user_metadata?.name || user.email?.split('@')[0] || 'User'}
       />
-      <main className="flex-1 bg-background p-4 md:p-8">
+      <main className="flex-1 min-w-0 bg-background p-4 md:p-8">
+        <SidebarTrigger className="mb-4" />
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -32,7 +34,7 @@ const SignedContent = ({ user }: { user: User }) => {
               </div>
             </div>
           </div>
-          <div className="bg-card rounded-lg shadow-sm border p-6">
+          <div>
             <DiplomaManager />
           </div>
         </div>
